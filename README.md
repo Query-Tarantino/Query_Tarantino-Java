@@ -56,6 +56,8 @@ services/
 scripts/
   fill_cache.sh        downloads the benchmark dataset from the official Gutenberg mirror
   compare_results.py   builds the data structure comparison report from the benchmark results
+  comparison/          its code: model/, ports/, adapters/ (CSV, charts), report/ (Markdown), commands/
+  tests/               unit tests of comparison/, in the same package layout
 workload/     experiment definition shared by every language implementation
   book_ids.txt     candidate book ids for the benchmark dataset, in order
   sample_ids.txt   small sample dataset to test the pipeline quickly
@@ -99,6 +101,7 @@ The following directories are **created at runtime** in the project root and are
 - Java 25
 - Maven 3.9+
 - Docker, only for the `mongo` index or metadata backends and for their tests
+- Python 3.10+ for the comparison report (matplotlib is optional and only adds charts)
 
 MongoDB runs in Docker with the version shared by every implementation:
 
@@ -172,7 +175,8 @@ mvn -q -pl services/control exec:java
 ## Tests
 
 ```bash
-mvn test
+mvn test                                              # Java services
+python3 -m unittest discover -s scripts -t scripts    # comparison report
 ```
 
 MongoDB adapters are tested with [Testcontainers](https://testcontainers.com/), which starts a disposable
@@ -251,6 +255,8 @@ matplotlib is installed.
 ```bash
 python3 scripts/compare_results.py
 ```
+
+Like `scripts/fill_cache.sh`, it works from any directory: both resolve paths from the project root.
 
 To compare languages as well, copy the `python-*.csv` and `csharp-*.csv` results of the other
 implementations, run on the same machine, into `benchmarks/results/` before running it.

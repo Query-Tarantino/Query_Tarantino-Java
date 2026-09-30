@@ -65,6 +65,7 @@ fail() {
 }
 
 main() {
+    cd "$(dirname "${BASH_SOURCE[0]}")/.."
     mkdir -p "$cache_dir"
     touch "$skipped_file"
     while (( $(cached_count) < target_books )); do
