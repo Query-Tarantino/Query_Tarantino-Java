@@ -4,12 +4,12 @@ import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
-import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkOptions;
-import org.ulpgc.tarantino.crawler.benchmarking.support.FootprintLog;
-import org.ulpgc.tarantino.crawler.benchmarking.support.JmhResults;
-import org.ulpgc.tarantino.crawler.benchmarking.support.Metric;
-import org.ulpgc.tarantino.crawler.benchmarking.support.ResultRow;
-import org.ulpgc.tarantino.crawler.benchmarking.support.ResultsFile;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkOptions;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.ResultsFile;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.JmhResults;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.Metric;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
 
 import java.util.Collection;
 import java.util.List;
@@ -18,7 +18,7 @@ import java.util.stream.Stream;
 
 public class BenchmarkRunner {
 
-    static final String SERVICE = "indexer";
+    public static final String SERVICE = "indexer";
 
     private static final Map<String, Metric> METRICS = Map.of(
             "fullBuildTime", Metric.asMeasured("full_build_time", "ms"),

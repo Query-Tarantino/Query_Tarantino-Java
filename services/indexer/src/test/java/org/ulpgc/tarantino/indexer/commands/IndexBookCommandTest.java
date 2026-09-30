@@ -1,13 +1,13 @@
 package org.ulpgc.tarantino.indexer.commands;
 
 import org.junit.jupiter.api.Test;
-import org.ulpgc.tarantino.indexer.model.Book;
-import org.ulpgc.tarantino.indexer.model.BookText;
-import org.ulpgc.tarantino.indexer.model.HeaderParser;
-import org.ulpgc.tarantino.indexer.model.TermOccurrences;
-import org.ulpgc.tarantino.indexer.model.Tokenizer;
-import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.model.book.Book;
+import org.ulpgc.tarantino.indexer.model.book.BookText;
+import org.ulpgc.tarantino.indexer.model.book.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.terms.TermOccurrences;
+import org.ulpgc.tarantino.indexer.model.terms.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.sources.DatalakeReader;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

@@ -1,8 +1,8 @@
 package org.ulpgc.tarantino.crawler.commands;
 
-import org.ulpgc.tarantino.crawler.model.DownloadException;
-import org.ulpgc.tarantino.crawler.model.FailureReason;
-import org.ulpgc.tarantino.crawler.model.GutenbergText;
+import org.ulpgc.tarantino.crawler.model.book.GutenbergText;
+import org.ulpgc.tarantino.crawler.model.failure.DownloadException;
+import org.ulpgc.tarantino.crawler.model.failure.FailureReason;
 import org.ulpgc.tarantino.crawler.ports.BookDownloader;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 

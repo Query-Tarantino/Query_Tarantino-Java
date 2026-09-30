@@ -1,7 +1,7 @@
 package org.ulpgc.tarantino.crawler.ports;
 
-import org.ulpgc.tarantino.crawler.model.BookText;
-import org.ulpgc.tarantino.crawler.model.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.book.BookText;
+import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
 
 import java.time.Instant;
 import java.util.Optional;

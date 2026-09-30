@@ -1,9 +1,9 @@
 package org.ulpgc.tarantino.query;
 
 import org.junit.jupiter.api.Test;
-import org.ulpgc.tarantino.query.adapters.FolderPerTermIndexReader;
-import org.ulpgc.tarantino.query.adapters.MonolithicJsonIndexReader;
-import org.ulpgc.tarantino.query.adapters.SqliteMetadataReader;
+import org.ulpgc.tarantino.query.adapters.index.folders.FolderPerTermIndexReader;
+import org.ulpgc.tarantino.query.adapters.index.json.MonolithicJsonIndexReader;
+import org.ulpgc.tarantino.query.adapters.metadata.SqliteMetadataReader;
 
 import java.nio.file.Path;
 

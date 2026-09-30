@@ -1,11 +1,11 @@
 package org.ulpgc.tarantino.indexer.benchmarking.support;
 
-import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkPaths;
-import org.ulpgc.tarantino.crawler.benchmarking.support.Directories;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
 import org.ulpgc.tarantino.indexer.IndexerFactory;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
-import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
 import java.nio.file.Path;
 

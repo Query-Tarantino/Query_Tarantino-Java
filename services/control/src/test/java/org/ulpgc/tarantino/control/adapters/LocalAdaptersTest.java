@@ -3,17 +3,17 @@ package org.ulpgc.tarantino.control.adapters;
 import org.junit.jupiter.api.Test;
 import org.ulpgc.tarantino.control.model.Outcome;
 import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
-import org.ulpgc.tarantino.crawler.model.DownloadException;
-import org.ulpgc.tarantino.crawler.model.FailureReason;
-import org.ulpgc.tarantino.crawler.model.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.failure.DownloadException;
+import org.ulpgc.tarantino.crawler.model.failure.FailureReason;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 import org.ulpgc.tarantino.indexer.commands.IndexBookCommand;
-import org.ulpgc.tarantino.indexer.model.BookText;
-import org.ulpgc.tarantino.indexer.model.HeaderParser;
-import org.ulpgc.tarantino.indexer.model.TermOccurrences;
-import org.ulpgc.tarantino.indexer.model.Tokenizer;
-import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.model.book.BookText;
+import org.ulpgc.tarantino.indexer.model.book.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.terms.TermOccurrences;
+import org.ulpgc.tarantino.indexer.model.terms.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.sources.DatalakeReader;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -51,7 +51,7 @@ class LocalAdaptersTest {
     private static IngestBookCommand ingest(StoredPaths stored) {
         DatalakeStorage datalake = new DatalakeStorage() {
             @Override
-            public StoredPaths save(org.ulpgc.tarantino.crawler.model.BookText book) {
+            public StoredPaths save(org.ulpgc.tarantino.crawler.model.book.BookText book) {
                 throw new AssertionError("Nothing must be saved");
             }
 

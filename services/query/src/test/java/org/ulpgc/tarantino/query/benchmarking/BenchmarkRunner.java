@@ -3,10 +3,10 @@ package org.ulpgc.tarantino.query.benchmarking;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
-import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkOptions;
-import org.ulpgc.tarantino.crawler.benchmarking.support.JmhResults;
-import org.ulpgc.tarantino.crawler.benchmarking.support.Metric;
-import org.ulpgc.tarantino.crawler.benchmarking.support.ResultsFile;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkOptions;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.ResultsFile;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.JmhResults;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.Metric;
 
 import java.util.Collection;
 import java.util.Map;

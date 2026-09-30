@@ -67,13 +67,23 @@ Each service follows the same layout:
 
 ```
 src/main/java/org/ulpgc/tarantino/<service>/
-  model/      records and pure domain logic
+  model/      records and pure domain logic, grouped by concept (model/book, model/terms)
   ports/      interfaces the service depends on
-  adapters/   implementations of the ports (filesystem, HTTP, SQLite, MongoDB)
+  adapters/   implementations of the ports, one subpackage per functionality:
+                datalake/   time/, book/, batch/   one subpackage per compared layout
+                index/      json/, folders/, mongo/ one subpackage per compared structure
+                metadata/   SQLite and MongoDB backends
+                mongo/, stopwords/, gutenberg/
   commands/   use cases
   Main, <Service>Config, <Service>Factory
-src/test/java/org/ulpgc/tarantino/<service>/benchmarking/
+src/test/java/org/ulpgc/tarantino/<service>/
+  ...         unit tests, in the package of the class they test
+  benchmarking/   JMH benchmarks by comparison, and support/ code shared through the test-jars
 ```
+
+No package holds more than three classes. Helpers used by a single structure stay package-private
+inside its package (e.g. `index/folders/TermFiles`); only helpers shared by several structures are public
+(e.g. `datalake/BookFiles`, `index/PendingPostings`).
 
 The following directories are **created at runtime** in the project root and are not versioned:
 
@@ -123,7 +133,7 @@ the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
 
 Every service is a plain Java program run through Maven from a terminal; no IDE is needed.
 Always run from the **project root**, so `datalake/`, `datamarts/` and `control/` are created there.
-Books are downloaded from the official Project Gutenberg mirror `gutenberg.pglaf.org`.
+Books are downloaded from the official Project Gutenberg mirror `mirror.cs.odu.edu`.
 
 **1. Build once.** The control service uses the crawler and indexer jars, so install them all:
 
@@ -185,14 +195,13 @@ project root; it can be interrupted and resumes where it stopped:
 scripts/fill_cache.sh
 ```
 
-It downloads from the official mirror `gutenberg.pglaf.org`, following `workload/book_ids.txt`, until
+It downloads from the official mirror `mirror.cs.odu.edu`, following `workload/book_ids.txt`, until
 `benchmarks/cache/` holds 2 800 books with Gutenberg markers (ids without them are listed in
 `benchmarks/cache/skipped.txt`). `TARANTINO_CACHE_BOOKS` changes the target and
-`TARANTINO_CACHE_PARALLEL` the number of simultaneous downloads (default 8).
+`TARANTINO_CACHE_PARALLEL` the number of simultaneous downloads (default 16).
 
-The dataset is about 1.3 GB (2 800 books of 470 KB on average). The mirror is in San Diego and serves each
-connection at roughly 100–250 KB/s, so the time depends on parallel downloads: about 1 hour with 4,
-**45 minutes with 8** and 30 minutes with 16.
+The dataset is about 1.3 GB (2 800 books of 470 KB on average) and downloads in **about 4 minutes** with the
+default 16 parallel downloads (measured: about 12 books per second).
 
 ### Running
 

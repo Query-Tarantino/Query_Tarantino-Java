@@ -1,9 +1,9 @@
 package org.ulpgc.tarantino.crawler;
 
 import org.junit.jupiter.api.Test;
-import org.ulpgc.tarantino.crawler.adapters.BatchBasedDatalakeAdapter;
-import org.ulpgc.tarantino.crawler.adapters.BookBasedDatalakeAdapter;
-import org.ulpgc.tarantino.crawler.adapters.TimeBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.batch.BatchBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.book.BookBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.time.TimeBasedDatalakeAdapter;
 
 import java.nio.file.Path;
 

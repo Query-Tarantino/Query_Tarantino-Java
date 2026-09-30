@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly MIRROR_URL_TEMPLATE="https://gutenberg.pglaf.org/cache/epub/%d/pg%d.txt"
+readonly MIRROR_URL_TEMPLATE="https://mirror.cs.odu.edu/gutenberg-epub/%d/pg%d.txt"
 readonly START_MARKER='\*\*\* ?START OF (THE|THIS) PROJECT GUTENBERG EBOOK'
 readonly END_MARKER='\*\*\* ?END OF (THE|THIS) PROJECT GUTENBERG EBOOK'
 
 readonly workload_dir="${TARANTINO_WORKLOAD:-workload}"
 readonly cache_dir="${TARANTINO_BENCHMARKS:-benchmarks}/cache"
 readonly target_books="${TARANTINO_CACHE_BOOKS:-2800}"
-readonly parallel_downloads="${TARANTINO_CACHE_PARALLEL:-8}"
+readonly parallel_downloads="${TARANTINO_CACHE_PARALLEL:-16}"
 readonly skipped_file="$cache_dir/skipped.txt"
 
 cached_ids() {

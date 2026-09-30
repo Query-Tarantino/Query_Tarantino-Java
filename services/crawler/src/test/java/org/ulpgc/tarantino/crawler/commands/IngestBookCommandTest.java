@@ -1,10 +1,10 @@
 package org.ulpgc.tarantino.crawler.commands;
 
 import org.junit.jupiter.api.Test;
-import org.ulpgc.tarantino.crawler.model.BookText;
-import org.ulpgc.tarantino.crawler.model.DownloadException;
-import org.ulpgc.tarantino.crawler.model.FailureReason;
-import org.ulpgc.tarantino.crawler.model.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.book.BookText;
+import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.failure.DownloadException;
+import org.ulpgc.tarantino.crawler.model.failure.FailureReason;
 import org.ulpgc.tarantino.crawler.ports.BookDownloader;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 

@@ -1,12 +1,12 @@
 package org.ulpgc.tarantino.indexer;
 
 import org.junit.jupiter.api.Test;
-import org.ulpgc.tarantino.indexer.adapters.BatchBasedDatalakeReader;
-import org.ulpgc.tarantino.indexer.adapters.BookBasedDatalakeReader;
-import org.ulpgc.tarantino.indexer.adapters.FolderPerTermIndexAdapter;
-import org.ulpgc.tarantino.indexer.adapters.MonolithicJsonIndexAdapter;
-import org.ulpgc.tarantino.indexer.adapters.SqliteMetadataAdapter;
-import org.ulpgc.tarantino.indexer.adapters.TimeBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.batch.BatchBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.book.BookBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.time.TimeBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.index.folders.FolderPerTermIndexAdapter;
+import org.ulpgc.tarantino.indexer.adapters.index.json.MonolithicJsonIndexAdapter;
+import org.ulpgc.tarantino.indexer.adapters.metadata.SqliteMetadataAdapter;
 
 import java.nio.file.Path;
 

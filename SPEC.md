@@ -48,9 +48,10 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
 
 ## 4. Download
 
-- URL: `https://gutenberg.pglaf.org/cache/epub/<id>/pg<id>.txt`, following redirects. This is the official
-  high-speed mirror of Project Gutenberg (listed in `https://www.gutenberg.org/MIRRORS.ALL`) and serves the
-  same files as `www.gutenberg.org`, which must not be used for bulk downloads.
+- URL: `https://mirror.cs.odu.edu/gutenberg-epub/<id>/pg<id>.txt`, following redirects. This is the official
+  high-speed mirror of Project Gutenberg at Old Dominion University (listed in
+  `https://www.gutenberg.org/MIRRORS.ALL`); it serves the same generated files as
+  `www.gutenberg.org/cache/epub`, which must not be used for bulk downloads.
 - The response body is decoded as UTF-8.
 - HTTP 200 returns the text. HTTP 404 fails with `NOT_FOUND`. Any other status, timeout or I/O error
   fails with `NETWORK_ERROR`. A 30 second timeout is recommended.

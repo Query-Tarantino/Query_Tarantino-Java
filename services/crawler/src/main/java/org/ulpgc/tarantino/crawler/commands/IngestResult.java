@@ -1,7 +1,7 @@
 package org.ulpgc.tarantino.crawler.commands;
 
-import org.ulpgc.tarantino.crawler.model.FailureReason;
-import org.ulpgc.tarantino.crawler.model.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
+import org.ulpgc.tarantino.crawler.model.failure.FailureReason;
 
 public record IngestResult(int bookId, StoredPaths paths, FailureReason failure) {
 

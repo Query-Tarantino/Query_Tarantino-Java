@@ -1,16 +1,16 @@
 package org.ulpgc.tarantino.indexer.benchmarking.support;
 
-import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkDataset;
-import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkPaths;
-import org.ulpgc.tarantino.crawler.model.GutenbergText;
-import org.ulpgc.tarantino.indexer.adapters.FileStopwordsLoader;
-import org.ulpgc.tarantino.indexer.model.Book;
-import org.ulpgc.tarantino.indexer.model.BookText;
-import org.ulpgc.tarantino.indexer.model.HeaderParser;
-import org.ulpgc.tarantino.indexer.model.TermOccurrences;
-import org.ulpgc.tarantino.indexer.model.Tokenizer;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
-import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
+import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.model.book.GutenbergText;
+import org.ulpgc.tarantino.indexer.adapters.stopwords.FileStopwordsLoader;
+import org.ulpgc.tarantino.indexer.model.book.Book;
+import org.ulpgc.tarantino.indexer.model.book.BookText;
+import org.ulpgc.tarantino.indexer.model.book.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.terms.TermOccurrences;
+import org.ulpgc.tarantino.indexer.model.terms.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -53,7 +53,7 @@ public final class IndexFixture {
     }
 
     private BookText bookText(int bookId) {
-        org.ulpgc.tarantino.crawler.model.BookText split = GutenbergText.bookText(bookId, dataset.rawText(bookId));
+        org.ulpgc.tarantino.crawler.model.book.BookText split = GutenbergText.bookText(bookId, dataset.rawText(bookId));
         return new BookText(bookId, split.header(), split.body(), Path.of("datalake", bookId + ".body.txt"));
     }
 }
