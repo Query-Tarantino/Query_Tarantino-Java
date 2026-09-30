@@ -29,7 +29,7 @@
         <testcontainers.version>2.0.5</testcontainers.version>
 
         <benchmark.runner>org.ulpgc.tarantino.${project.artifactId}.benchmarking.BenchmarkRunner</benchmark.runner>
-        <benchmark.skip>false</benchmark.skip>
+        <benchmark.skip>true</benchmark.skip>
     </properties>
 
     <dependencyManagement>
@@ -41,8 +41,20 @@
             </dependency>
             <dependency>
                 <groupId>org.ulpgc.tarantino</groupId>
+                <artifactId>crawler</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>org.ulpgc.tarantino</groupId>
                 <artifactId>indexer</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ulpgc.tarantino</groupId>
+                <artifactId>indexer</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
             </dependency>
             <dependency>
                 <groupId>org.xerial</groupId>
@@ -119,6 +131,26 @@
                     <version>3.5.2</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.5.1</version>
+                    <executions>
+                        <execution>
+                            <id>benchmark-support</id>
+                            <goals>
+                                <goal>test-jar</goal>
+                            </goals>
+                            <configuration>
+                                <excludes>
+                                    <exclude>META-INF/BenchmarkList</exclude>
+                                    <exclude>META-INF/CompilerHints</exclude>
+                                    <exclude>**/jmh_generated/**</exclude>
+                                </excludes>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.5.0</version>
@@ -141,7 +173,7 @@
                         <executions>
                             <execution>
                                 <id>run-benchmarks</id>
-                                <phase>test</phase>
+                                <phase>verify</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
@@ -152,6 +184,7 @@
                                     <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
                                     <arguments>
                                         <argument>--enable-native-access=ALL-UNNAMED</argument>
+                                        <argument>--sun-misc-unsafe-memory-access=allow</argument>
                                         <argument>-classpath</argument>
                                         <classpath/>
                                         <argument>${benchmark.runner}</argument>

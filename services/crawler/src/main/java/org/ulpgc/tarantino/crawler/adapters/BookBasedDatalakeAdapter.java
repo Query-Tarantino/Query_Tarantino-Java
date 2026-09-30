@@ -5,7 +5,10 @@ import org.ulpgc.tarantino.crawler.model.StoredPaths;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class BookBasedDatalakeAdapter implements DatalakeStorage {
 
@@ -26,6 +29,14 @@ public class BookBasedDatalakeAdapter implements DatalakeStorage {
     @Override
     public Optional<StoredPaths> pathsOf(int bookId) {
         return BookFiles.existing(paths(bookId));
+    }
+
+    @Override
+    public Set<Integer> idsStoredSince(Instant instant) {
+        return BookFiles.children(root).stream()
+                .filter(directory -> BookFiles.modifiedSince(directory.resolve(BODY_FILE), instant))
+                .map(directory -> Integer.valueOf(directory.getFileName().toString()))
+                .collect(Collectors.toSet());
     }
 
     private StoredPaths paths(int bookId) {

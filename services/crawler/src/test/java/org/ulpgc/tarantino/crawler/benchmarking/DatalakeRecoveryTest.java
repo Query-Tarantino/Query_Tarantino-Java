@@ -1,13 +1,30 @@
 package org.ulpgc.tarantino.crawler.benchmarking;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.ulpgc.tarantino.crawler.benchmarking.support.RecoveryScenario;
+import org.ulpgc.tarantino.crawler.ports.BookDownloader;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatalakeRecoveryTest {
 
-    @Test
-    @Disabled("Not implemented yet")
-    void resumesAfterInterruptionWithoutDuplicatesOrLosses() {
-        throw new UnsupportedOperationException("Interrupt ingestion mid-batch for each layout, resume, and assert every id is stored once");
+    private static final BookDownloader SYNTHETIC_BOOKS = bookId ->
+            "Title: Book " + bookId + "\n*** START OF THE PROJECT GUTENBERG EBOOK X ***\nbody " + bookId + "\n*** END OF THE PROJECT GUTENBERG EBOOK X ***";
+
+    @TempDir
+    Path root;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"time", "book", "batch"})
+    void resumesAfterInterruptionWithoutDuplicatesOrLosses(String layout) {
+        List<Integer> ids = IntStream.rangeClosed(1, 20).boxed().toList();
+
+        assertTrue(new RecoveryScenario(layout, root, SYNTHETIC_BOOKS).succeedsFor(ids));
     }
 }

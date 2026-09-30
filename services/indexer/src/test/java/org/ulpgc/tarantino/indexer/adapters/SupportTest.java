@@ -31,6 +31,12 @@ class SupportTest {
     }
 
     @Test
+    void mongoDatabaseComesFromTheUriOrDefaultsToTarantino() {
+        assertEquals("tarantino", MongoDatabases.database("mongodb://localhost:27017").getName());
+        assertEquals("tarantino_benchmark", MongoDatabases.database("mongodb://localhost:27017/tarantino_benchmark").getName());
+    }
+
+    @Test
     void portablePathsUseForwardSlashes() {
         assertEquals("datalake/20250925/14/5.body.txt", PortablePaths.of(Path.of("datalake", "20250925", "14", "5.body.txt")));
     }

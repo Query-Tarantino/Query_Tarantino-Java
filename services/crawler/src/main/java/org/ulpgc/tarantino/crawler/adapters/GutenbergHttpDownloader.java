@@ -14,7 +14,7 @@ import java.time.Duration;
 
 public class GutenbergHttpDownloader implements BookDownloader {
 
-    private static final String GUTENBERG_URL_TEMPLATE = "https://www.gutenberg.org/cache/epub/%d/pg%d.txt";
+    private static final String MIRROR_URL_TEMPLATE = "https://gutenberg.pglaf.org/cache/epub/%d/pg%d.txt";
     private static final String USER_AGENT = "query-tarantino/1.0 (ULPGC Big Data course project)";
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
@@ -25,7 +25,7 @@ public class GutenbergHttpDownloader implements BookDownloader {
             .build();
 
     public GutenbergHttpDownloader() {
-        this(GUTENBERG_URL_TEMPLATE);
+        this(MIRROR_URL_TEMPLATE);
     }
 
     public GutenbergHttpDownloader(String urlTemplate) {

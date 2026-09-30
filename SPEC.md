@@ -41,14 +41,16 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
 
 | File             | Content                                                              |
 |------------------|----------------------------------------------------------------------|
-| `book_ids.txt`   | Candidate ids for benchmarks, in order.                              |
+| `book_ids.txt`   | Candidate ids for the benchmark cache, in order (1 to 4000).         |
 | `sample_ids.txt` | Small sample dataset; default candidates of the control service.     |
 | `stopwords.txt`  | Stopwords; each entry is stripped and lowercased (see §7) on load.   |
 | `queries.txt`    | One query per line for the search benchmark.                         |
 
 ## 4. Download
 
-- URL: `https://www.gutenberg.org/cache/epub/<id>/pg<id>.txt`, following redirects.
+- URL: `https://gutenberg.pglaf.org/cache/epub/<id>/pg<id>.txt`, following redirects. This is the official
+  high-speed mirror of Project Gutenberg (listed in `https://www.gutenberg.org/MIRRORS.ALL`) and serves the
+  same files as `www.gutenberg.org`, which must not be used for bulk downloads.
 - The response body is decoded as UTF-8.
 - HTTP 200 returns the text. HTTP 404 fails with `NOT_FOUND`. Any other status, timeout or I/O error
   fails with `NETWORK_ERROR`. A 30 second timeout is recommended.
@@ -92,6 +94,12 @@ Writing and lookup:
 4. Lookup by id: `book` and `batch` compute the path directly; `time` searches the body file name
    under `<root>` up to depth 3.
 
+New books detection lists the ids of the books stored since an instant:
+
+- `time`: every book in the hour directories from the hour that contains the instant (UTC) onwards,
+  decided by the directory names alone.
+- `book` and `batch`: every book whose body file was last modified at or after the instant.
+
 ## 7. Metadata extraction and tokenization
 
 **Header fields.** For each of `Title`, `Author` and `Language`, take the first match of
@@ -123,13 +131,15 @@ the structure has an order.
 |-----------|--------------------------------------------------|--------|
 | `json`    | `<datamarts>/inverted_index.json`                | One JSON object: term → array of ids, e.g. `{"island": [5, 1342]}` |
 | `folders` | `<datamarts>/inverted_index/<c>/<term>.txt`      | One id per line; `<c>` is the first code point of the term (`é/écume.txt`) |
-| `mongo`   | database `tarantino`, collection `inverted_index` | One document per term: `{"term": "island", "postings": [5, 1342]}`, unique index on `term` |
+| `mongo`   | database `tarantino`*, collection `inverted_index` | One document per term: `{"term": "island", "postings": [5, 1342]}`, unique index on `term` |
 
 - `json` is rewritten completely, and atomically (`.tmp` + rename), each time the index is flushed.
 - `folders` rewrites, on each flush, every affected term file with the union of its stored ids and the
   new ones, sorted and atomically (`.tmp` + rename). Term files that gain no new id are not touched.
 - `mongo` upserts one document per affected term, adding the ids with `$addToSet`; readers must treat
   `postings` as a set.
+
+\* Or the database named in the path of `TARANTINO_MONGO_URI` (`mongodb://host:27017/<database>`).
 
 ### 8.2 Metadata
 
@@ -139,7 +149,7 @@ Saving a book that already exists replaces its row or document.
 | Backend  | Location                            | Schema |
 |----------|-------------------------------------|--------|
 | `sqlite` | `<datamarts>/metadata.db`, table `books` | `book_id INTEGER PRIMARY KEY, title TEXT, author TEXT, language TEXT, path TEXT NOT NULL` |
-| `mongo`  | database `tarantino`, collection `books` | Same fields, unique index on `book_id`, missing fields stored as `null` |
+| `mongo`  | database `tarantino`*, collection `books` | Same fields, unique index on `book_id`, missing fields stored as `null` |
 
 ## 9. Control layer
 
@@ -177,19 +187,32 @@ Author lookup is a case-insensitive substring match (ASCII case folding is enoug
 
 ## 11. Benchmarks
 
-**Dataset.** Raw texts are downloaded once to `<benchmarks>/cache/<id>.txt`, unchanged, following
-`book_ids.txt`. Ids whose download fails are skipped. The dataset of size N is the first N ids of
-`book_ids.txt` present in the cache. Every implementation reads from the same cache, so the network
-is never measured.
+**Dataset.** `scripts/fill_cache.sh` downloads raw texts once from the official mirror (§4) to
+`<benchmarks>/cache/<id>.txt`, unchanged, following `book_ids.txt`, until the cache holds 2 800 books.
+Only books with both markers (§5) are cached; ids answered with 404 or without markers are listed in
+`<benchmarks>/cache/skipped.txt` and never retried, while network errors are retried on the next run.
+The dataset of size N is the first N ids of `book_ids.txt` present in the cache. Every implementation
+reads from the same cache, so the network is never measured.
 
-**Sizes.** N ∈ {100, 1000, 10000}. Incremental updates add 100 further books from the cache.
+**Sizes.** N ∈ {100, 500, 1000, 2000}. Each iteration of the incremental update, warm-up included, adds
+the next 100 cached books after the first N, so 3 + 5 iterations need N + 800 books: the cache holds
+2 800. New books detection stores N books as one day old and then 100 new ones.
 
 **Execution.** Same machine for all languages, nothing else running, and the same MongoDB server
-(`mongo:7.0` from `docker-compose.yml`). At least 3 warm-up and
-5 measured iterations per data point; report the mean. Record CPU, RAM, OS and runtime versions.
+(`mongo:7.0` from `docker-compose.yml`), using one database per benchmark. Each data point is the
+mean of the measured iterations:
+
+| Kind of metric                                                    | Warm-up       | Measured      |
+|-------------------------------------------------------------------|---------------|---------------|
+| One whole run: write, full build, incremental update, insertion   | 3 runs        | 5 runs        |
+| One operation: lookup, detection, query, metadata queries         | 3 × 1 second  | 5 × 1 second  |
+
+Storage is emptied before every run of the first kind. Record CPU, RAM, OS and runtime versions.
 
 **Results.** Each implementation writes `<benchmarks>/results/<language>-<service>.csv` with the header
 `language,structure,metric,n_books,value,unit`, e.g. `java,time,write_throughput,1000,812.4,books/s`.
+With the results of every language in that directory, `scripts/compare_results.py` builds the
+comparison report in `<benchmarks>/report/`.
 
 | Group    | Structures                   | Metric                     | Unit    |
 |----------|------------------------------|----------------------------|---------|
@@ -209,11 +232,23 @@ is never measured.
 |          |                              | `book_by_id_time`          | µs/op   |
 |          |                              | `books_by_author_time`     | µs/op   |
 
-- `new_books_detection_time`: time to list the books stored after a given instant.
-- `recovery_ok`: 1 if, after killing ingestion in the middle of a batch and running it again,
-  every id is stored exactly once.
-- `query_time`: mean over every query of `queries.txt`.
-- For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections.
+- `write_throughput`: N divided by the time to read, split (§5) and store the N cached books.
+- `lookup_time`: time to find the header and body of a random stored book.
+- `new_books_detection_time`: time to list the 100 new books (§6, new books detection).
+- `recovery_ok`: measured with 100 books. Half of them are ingested; the next one is interrupted after
+  its header is written, leaving its body as `.tmp`; ingestion of all 100 is then run again one hour
+  later. It is 1 if every book ends with exactly one body file, 0 otherwise.
+- `file_count`, `directory_count`, `disk_usage`: the datalake after writing N books; directories do not
+  count the root, and `disk_usage` is the sum of file sizes in bytes.
+- `full_build_time` and `memory_allocated`: time and bytes allocated to read, split, tokenize and index
+  N books into an empty index, flushing once at the end.
+- `incremental_update_time`: time to index 100 new books into an index of N books, opening the index
+  from storage as a new process would.
+- `query_time`: time of a random query of `queries.txt` against an index of N books; metadata is not
+  read, so only the index is measured.
+- `bulk_insertion_time`: time to save the metadata of N books into an empty backend.
+- `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, among N books.
+- For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`.
 
 ## 12. Known limitations
 

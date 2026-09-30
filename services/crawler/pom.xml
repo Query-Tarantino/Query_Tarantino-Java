@@ -14,6 +14,7 @@
 
     <properties>
         <exec.mainClass>org.ulpgc.tarantino.crawler.Main</exec.mainClass>
+        <benchmark.skip>false</benchmark.skip>
     </properties>
 
     <dependencies>
@@ -23,5 +24,14 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

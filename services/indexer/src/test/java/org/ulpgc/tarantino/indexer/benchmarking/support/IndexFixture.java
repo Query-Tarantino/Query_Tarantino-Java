@@ -1,0 +1,59 @@
+package org.ulpgc.tarantino.indexer.benchmarking.support;
+
+import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkDataset;
+import org.ulpgc.tarantino.crawler.benchmarking.support.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.model.GutenbergText;
+import org.ulpgc.tarantino.indexer.adapters.FileStopwordsLoader;
+import org.ulpgc.tarantino.indexer.model.Book;
+import org.ulpgc.tarantino.indexer.model.BookText;
+import org.ulpgc.tarantino.indexer.model.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.TermOccurrences;
+import org.ulpgc.tarantino.indexer.model.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
+
+import java.nio.file.Path;
+import java.util.List;
+
+public final class IndexFixture {
+
+    private final BenchmarkDataset dataset;
+    private final Tokenizer tokenizer;
+    private final HeaderParser headerParser = new HeaderParser();
+
+    public IndexFixture(BenchmarkDataset dataset, Tokenizer tokenizer) {
+        this.dataset = dataset;
+        this.tokenizer = tokenizer;
+    }
+
+    public static IndexFixture fromEnvironment() {
+        Path stopwords = BenchmarkPaths.workload().resolve("stopwords.txt");
+        return new IndexFixture(BenchmarkDataset.fromEnvironment(), new Tokenizer(new FileStopwordsLoader(stopwords).stopwords()));
+    }
+
+    public BenchmarkDataset dataset() {
+        return dataset;
+    }
+
+    public void index(InvertedIndexStorage invertedIndex, List<Integer> ids) {
+        ids.stream().map(this::occurrences).forEach(invertedIndex::add);
+        invertedIndex.flush();
+    }
+
+    public void save(MetadataStorage metadata, List<Book> books) {
+        books.forEach(metadata::save);
+    }
+
+    public List<Book> books(List<Integer> ids) {
+        return ids.stream().map(this::bookText).map(headerParser::book).toList();
+    }
+
+    private TermOccurrences occurrences(int bookId) {
+        return tokenizer.occurrences(bookId, bookText(bookId).body());
+    }
+
+    private BookText bookText(int bookId) {
+        org.ulpgc.tarantino.crawler.model.BookText split = GutenbergText.bookText(bookId, dataset.rawText(bookId));
+        return new BookText(bookId, split.header(), split.body(), Path.of("datalake", bookId + ".body.txt"));
+    }
+}

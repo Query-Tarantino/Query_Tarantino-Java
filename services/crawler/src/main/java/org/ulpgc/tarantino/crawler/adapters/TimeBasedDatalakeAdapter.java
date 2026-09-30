@@ -9,9 +9,12 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class TimeBasedDatalakeAdapter implements DatalakeStorage {
@@ -44,9 +47,36 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
         return bodyFile(bookId).map(body -> pathsIn(body.getParent(), bookId));
     }
 
+    @Override
+    public Set<Integer> idsStoredSince(Instant instant) {
+        String firstHour = hourKey(LocalDateTime.ofInstant(instant, clock.getZone()));
+        return hourDirectories()
+                .filter(directory -> hourKey(directory).compareTo(firstHour) >= 0)
+                .flatMap(TimeBasedDatalakeAdapter::bookIdsIn)
+                .collect(Collectors.toSet());
+    }
+
     private Path currentDirectory() {
         LocalDateTime now = LocalDateTime.now(clock);
         return root.resolve(DAY_DIRECTORY.format(now)).resolve(HOUR_DIRECTORY.format(now));
+    }
+
+    private Stream<Path> hourDirectories() {
+        return BookFiles.children(root).stream().flatMap(day -> BookFiles.children(day).stream());
+    }
+
+    private static String hourKey(LocalDateTime time) {
+        return DAY_DIRECTORY.format(time) + HOUR_DIRECTORY.format(time);
+    }
+
+    private static String hourKey(Path hourDirectory) {
+        return hourDirectory.getParent().getFileName().toString() + hourDirectory.getFileName();
+    }
+
+    private static Stream<Integer> bookIdsIn(Path hourDirectory) {
+        return BookFiles.children(hourDirectory).stream()
+                .filter(file -> file.getFileName().toString().endsWith(BODY_SUFFIX))
+                .map(file -> BookFiles.bookId(file, BODY_SUFFIX));
     }
 
     private static StoredPaths pathsIn(Path directory, int bookId) {

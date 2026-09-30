@@ -16,6 +16,7 @@ import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
 import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
@@ -57,6 +58,11 @@ class LocalAdaptersTest {
             @Override
             public Optional<StoredPaths> pathsOf(int bookId) {
                 return Optional.ofNullable(stored);
+            }
+
+            @Override
+            public Set<Integer> idsStoredSince(Instant instant) {
+                return Set.of();
             }
         };
         return new IngestBookCommand(bookId -> {

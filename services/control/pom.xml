@@ -14,7 +14,6 @@
 
     <properties>
         <exec.mainClass>org.ulpgc.tarantino.control.Main</exec.mainClass>
-        <benchmark.skip>true</benchmark.skip>
     </properties>
 
     <dependencies>
