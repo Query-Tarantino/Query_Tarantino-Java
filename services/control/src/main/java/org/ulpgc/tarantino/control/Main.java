@@ -28,10 +28,8 @@ public class Main {
                 IndexerFactory.indexCommand(IndexerConfig.fromEnvironment()),
                 candidates);
 
-        NextStep step;
-        do {
-            step = pipeline.runStep();
-            System.out.println("[CONTROL] " + step);
-        } while (step.action() != NextStep.Action.IDLE);
+        while (pipeline.runStep().action() != NextStep.Action.IDLE) {
+            // each step logs its own outcome
+        }
     }
 }

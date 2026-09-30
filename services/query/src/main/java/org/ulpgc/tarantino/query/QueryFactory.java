@@ -9,13 +9,20 @@ import org.ulpgc.tarantino.query.commands.SearchCommand;
 import org.ulpgc.tarantino.query.ports.InvertedIndexReader;
 import org.ulpgc.tarantino.query.ports.MetadataReader;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 public final class QueryFactory {
 
     private QueryFactory() {
     }
 
     public static SearchCommand searchCommand(QueryConfig config) {
-        return new SearchCommand(invertedIndex(config), metadata(config));
+        return new SearchCommand(invertedIndex(config), metadata(config), stopwords(config));
     }
 
     public static InvertedIndexReader invertedIndex(QueryConfig config) {
@@ -33,5 +40,16 @@ public final class QueryFactory {
             case "mongo" -> new MongodbMetadataReader(config.mongoUri());
             default -> throw new IllegalArgumentException("Unknown metadata backend: " + config.metadata());
         };
+    }
+
+    private static Set<String> stopwords(QueryConfig config) {
+        try {
+            return Files.readAllLines(config.workload().resolve("stopwords.txt")).stream()
+                    .map(line -> line.strip().toLowerCase(Locale.ROOT))
+                    .filter(line -> !line.isEmpty())
+                    .collect(Collectors.toUnmodifiableSet());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

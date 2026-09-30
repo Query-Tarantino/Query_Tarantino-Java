@@ -38,7 +38,7 @@ public class QueryBenchmark {
     public void setUp() {
         // TODO: load workload/queries.txt; datamarts must be built beforehand by the indexer
         QueryConfig config = new QueryConfig(Path.of("datamarts"), index, metadata,
-                System.getenv().getOrDefault("TARANTINO_MONGO_URI", "mongodb://localhost:27017"));
+                System.getenv().getOrDefault("TARANTINO_MONGO_URI", "mongodb://localhost:27017"), Path.of("workload"));
         invertedIndex = QueryFactory.invertedIndex(config);
         metadataReader = QueryFactory.metadata(config);
     }
