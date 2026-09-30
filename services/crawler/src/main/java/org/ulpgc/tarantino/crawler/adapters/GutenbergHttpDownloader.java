@@ -14,22 +14,31 @@ import java.time.Duration;
 
 public class GutenbergHttpDownloader implements BookDownloader {
 
-    private static final String URL_TEMPLATE = "https://www.gutenberg.org/cache/epub/%d/pg%d.txt";
+    private static final String GUTENBERG_URL_TEMPLATE = "https://www.gutenberg.org/cache/epub/%d/pg%d.txt";
     private static final String USER_AGENT = "query-tarantino/1.0 (ULPGC Big Data course project)";
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
+    private final String urlTemplate;
     private final HttpClient client = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(TIMEOUT)
             .build();
+
+    public GutenbergHttpDownloader() {
+        this(GUTENBERG_URL_TEMPLATE);
+    }
+
+    public GutenbergHttpDownloader(String urlTemplate) {
+        this.urlTemplate = urlTemplate;
+    }
 
     @Override
     public String rawText(int bookId) throws DownloadException {
         return body(response(request(bookId), bookId), bookId);
     }
 
-    private static HttpRequest request(int bookId) {
-        return HttpRequest.newBuilder(URI.create(URL_TEMPLATE.formatted(bookId, bookId)))
+    private HttpRequest request(int bookId) {
+        return HttpRequest.newBuilder(URI.create(urlTemplate.formatted(bookId, bookId)))
                 .timeout(TIMEOUT)
                 .header("User-Agent", USER_AGENT)
                 .build();

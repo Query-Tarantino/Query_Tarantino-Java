@@ -122,12 +122,14 @@ the structure has an order.
 | Structure | Location                                         | Format |
 |-----------|--------------------------------------------------|--------|
 | `json`    | `<datamarts>/inverted_index.json`                | One JSON object: term → array of ids, e.g. `{"island": [5, 1342]}` |
-| `folders` | `<datamarts>/inverted_index/<c>/<term>.txt`      | One id per line; `<c>` is the first character of the term |
+| `folders` | `<datamarts>/inverted_index/<c>/<term>.txt`      | One id per line; `<c>` is the first code point of the term (`é/écume.txt`) |
 | `mongo`   | database `tarantino`, collection `inverted_index` | One document per term: `{"term": "island", "postings": [5, 1342]}`, unique index on `term` |
 
 - `json` is rewritten completely, and atomically (`.tmp` + rename), each time the index is flushed.
-- `folders` appends new ids to the term file, keeping it sorted and without duplicates.
-- `mongo` adds ids with `$addToSet`; readers must treat `postings` as a set.
+- `folders` rewrites, on each flush, every affected term file with the union of its stored ids and the
+  new ones, sorted and atomically (`.tmp` + rename). Term files that gain no new id are not touched.
+- `mongo` upserts one document per affected term, adding the ids with `$addToSet`; readers must treat
+  `postings` as a set.
 
 ### 8.2 Metadata
 
@@ -182,7 +184,8 @@ is never measured.
 
 **Sizes.** N ∈ {100, 1000, 10000}. Incremental updates add 100 further books from the cache.
 
-**Execution.** Same machine for all languages, nothing else running. At least 3 warm-up and
+**Execution.** Same machine for all languages, nothing else running, and the same MongoDB server
+(`mongo:7.0` from `docker-compose.yml`). At least 3 warm-up and
 5 measured iterations per data point; report the mean. Record CPU, RAM, OS and runtime versions.
 
 **Results.** Each implementation writes `<benchmarks>/results/<language>-<service>.csv` with the header

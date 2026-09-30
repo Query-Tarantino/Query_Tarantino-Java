@@ -47,8 +47,17 @@ The following directories are **created at runtime** in the project root and are
 
 - Java 25
 - Maven 3.9+
-- MongoDB (only for the `mongo` index or metadata backends), e.g.
-  `docker run -d -p 27017:27017 --name tarantino-mongo mongo:7`
+- Docker, only for the `mongo` index or metadata backends and for their tests
+
+MongoDB runs in Docker with the version shared by every implementation:
+
+```bash
+docker compose up -d          # start MongoDB 7.0 on localhost:27017, data kept in a volume
+docker compose down           # stop it (add -v to also delete the data)
+```
+
+Without the Compose plugin, `docker run -d --name tarantino-mongo -p 27017:27017 -v tarantino-mongo-data:/data/db mongo:7.0`
+is equivalent.
 
 ## Configuration
 
@@ -82,6 +91,21 @@ mvn -q -pl services/control exec:java -Dexec.args="book_ids.txt"
 mvn -q -pl services/crawler exec:java -Dexec.args="1342 84"  # ingest specific books
 mvn -q -pl services/indexer exec:java -Dexec.args="1342 84"  # index specific books
 mvn -q -pl services/query   exec:java -Dexec.args="adventure island"
+```
+
+## Tests
+
+```bash
+mvn test
+```
+
+MongoDB adapters are tested with [Testcontainers](https://testcontainers.com/), which starts a disposable
+`mongo:7.0` container for the test run; no MongoDB needs to be running. Without Docker those tests are
+skipped, not failed. With [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop, export first:
+
+```bash
+export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
 ```
 
 ## Benchmarks

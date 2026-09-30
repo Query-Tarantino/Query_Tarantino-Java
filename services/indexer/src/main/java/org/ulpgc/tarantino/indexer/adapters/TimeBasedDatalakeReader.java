@@ -24,7 +24,7 @@ public class TimeBasedDatalakeReader implements DatalakeReader {
 
     @Override
     public Optional<BookText> bookText(int bookId) {
-        return bodyFile(bookId).map(body -> bookText(bookId, body));
+        return bodyFile(bookId).flatMap(body -> BookFiles.bookText(bookId, body.resolveSibling(bookId + HEADER_SUFFIX), body));
     }
 
     private Optional<Path> bodyFile(int bookId) {
@@ -34,18 +34,6 @@ public class TimeBasedDatalakeReader implements DatalakeReader {
     private Optional<Path> firstFileNamed(String name) {
         try (Stream<Path> files = Files.find(root, BOOK_FILE_DEPTH, (path, attributes) -> path.endsWith(name))) {
             return files.findFirst();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static BookText bookText(int bookId, Path body) {
-        return new BookText(bookId, content(body.resolveSibling(bookId + HEADER_SUFFIX)), content(body), body);
-    }
-
-    private static String content(Path file) {
-        try {
-            return Files.readString(file);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

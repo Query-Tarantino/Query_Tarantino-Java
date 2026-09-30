@@ -1,18 +1,37 @@
 package org.ulpgc.tarantino.indexer.adapters;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.ReplaceOptions;
+import org.bson.Document;
 import org.ulpgc.tarantino.indexer.model.Book;
 import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
 
+
 public class MongodbMetadataAdapter implements MetadataStorage {
 
-    private final String connectionUri;
+    private static final String COLLECTION = "books";
+
+    private final MongoCollection<Document> collection;
 
     public MongodbMetadataAdapter(String connectionUri) {
-        this.connectionUri = connectionUri;
+        this.collection = MongoDatabases.database(connectionUri).getCollection(COLLECTION);
+        this.collection.createIndex(Indexes.ascending("book_id"), new IndexOptions().unique(true));
     }
 
     @Override
     public void save(Book book) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        collection.replaceOne(Filters.eq("book_id", book.bookId()), document(book), new ReplaceOptions().upsert(true));
     }
+
+    private static Document document(Book book) {
+        return new Document("book_id", book.bookId())
+                .append("title", book.title())
+                .append("author", book.author())
+                .append("language", book.language())
+                .append("path", PortablePaths.of(book.path()));
+    }
+
 }

@@ -9,6 +9,10 @@ import java.util.Optional;
 
 public class BatchBasedDatalakeAdapter implements DatalakeStorage {
 
+    private static final int BATCH_SIZE = 1000;
+    private static final String HEADER_SUFFIX = ".header.txt";
+    private static final String BODY_SUFFIX = ".body.txt";
+
     private final Path root;
 
     public BatchBasedDatalakeAdapter(Path root) {
@@ -17,11 +21,16 @@ public class BatchBasedDatalakeAdapter implements DatalakeStorage {
 
     @Override
     public StoredPaths save(BookText book) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return BookFiles.write(paths(book.bookId()), book);
     }
 
     @Override
     public Optional<StoredPaths> pathsOf(int bookId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return BookFiles.existing(paths(bookId));
+    }
+
+    private StoredPaths paths(int bookId) {
+        Path directory = root.resolve(String.valueOf(bookId / BATCH_SIZE));
+        return new StoredPaths(directory.resolve(bookId + HEADER_SUFFIX), directory.resolve(bookId + BODY_SUFFIX));
     }
 }

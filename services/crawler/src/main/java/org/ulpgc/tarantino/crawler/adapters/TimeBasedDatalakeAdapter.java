@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -37,9 +36,7 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
 
     @Override
     public StoredPaths save(BookText book) {
-        StoredPaths paths = pathsIn(currentDirectory(), book.bookId());
-        write(paths, book);
-        return paths;
+        return BookFiles.write(pathsIn(currentDirectory(), book.bookId()), book);
     }
 
     @Override
@@ -66,21 +63,5 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private static void write(StoredPaths paths, BookText book) {
-        try {
-            writeAtomically(paths.header(), book.header());
-            writeAtomically(paths.body(), book.body());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static void writeAtomically(Path target, String content) throws IOException {
-        Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
-        Files.createDirectories(target.getParent());
-        Files.writeString(temporary, content);
-        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 }

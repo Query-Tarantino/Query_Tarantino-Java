@@ -1,0 +1,80 @@
+package org.ulpgc.tarantino.control.adapters;
+
+import org.junit.jupiter.api.Test;
+import org.ulpgc.tarantino.control.model.Outcome;
+import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
+import org.ulpgc.tarantino.crawler.model.DownloadException;
+import org.ulpgc.tarantino.crawler.model.FailureReason;
+import org.ulpgc.tarantino.crawler.model.StoredPaths;
+import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
+import org.ulpgc.tarantino.indexer.commands.IndexBookCommand;
+import org.ulpgc.tarantino.indexer.model.BookText;
+import org.ulpgc.tarantino.indexer.model.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.TermOccurrences;
+import org.ulpgc.tarantino.indexer.model.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
+import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class LocalAdaptersTest {
+
+    private static final StoredPaths STORED = new StoredPaths(Path.of("datalake/5/header.txt"), Path.of("datalake/5/body.txt"));
+
+    @Test
+    void crawlerReportsWhereTheBookWasStored() {
+        assertEquals(Outcome.success("stored in datalake/5"), new LocalCrawler(ingest(STORED)).ingest(5));
+    }
+
+    @Test
+    void crawlerReportsTheFailureReason() {
+        assertEquals(Outcome.failure("skipped, NOT_FOUND"), new LocalCrawler(ingest(null)).ingest(5));
+    }
+
+    @Test
+    void indexerReportsTheNumberOfUniqueTerms() {
+        BookText text = new BookText(5, "Title: T", "island whale island", Path.of("5.body.txt"));
+
+        assertEquals(Outcome.success("2 unique terms indexed"), new LocalIndexer(index(bookId -> Optional.of(text))).index(5));
+    }
+
+    @Test
+    void indexerReportsBooksMissingFromTheDatalake() {
+        assertEquals(Outcome.failure("skipped, not found in the datalake"), new LocalIndexer(index(bookId -> Optional.empty())).index(5));
+    }
+
+    private static IngestBookCommand ingest(StoredPaths stored) {
+        DatalakeStorage datalake = new DatalakeStorage() {
+            @Override
+            public StoredPaths save(org.ulpgc.tarantino.crawler.model.BookText book) {
+                throw new AssertionError("Nothing must be saved");
+            }
+
+            @Override
+            public Optional<StoredPaths> pathsOf(int bookId) {
+                return Optional.ofNullable(stored);
+            }
+        };
+        return new IngestBookCommand(bookId -> {
+            throw new DownloadException(FailureReason.NOT_FOUND, "missing");
+        }, datalake);
+    }
+
+    private static IndexBookCommand index(DatalakeReader datalake) {
+        InvertedIndexStorage index = new InvertedIndexStorage() {
+            @Override
+            public void add(TermOccurrences occurrences) {
+            }
+
+            @Override
+            public void flush() {
+            }
+        };
+        return new IndexBookCommand(datalake, new HeaderParser(), new Tokenizer(Set.of()), index, book -> {
+        });
+    }
+}

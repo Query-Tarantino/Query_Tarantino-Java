@@ -9,6 +9,9 @@ import java.util.Optional;
 
 public class BookBasedDatalakeAdapter implements DatalakeStorage {
 
+    private static final String HEADER_FILE = "header.txt";
+    private static final String BODY_FILE = "body.txt";
+
     private final Path root;
 
     public BookBasedDatalakeAdapter(Path root) {
@@ -17,11 +20,16 @@ public class BookBasedDatalakeAdapter implements DatalakeStorage {
 
     @Override
     public StoredPaths save(BookText book) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return BookFiles.write(paths(book.bookId()), book);
     }
 
     @Override
     public Optional<StoredPaths> pathsOf(int bookId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return BookFiles.existing(paths(bookId));
+    }
+
+    private StoredPaths paths(int bookId) {
+        Path directory = root.resolve(String.valueOf(bookId));
+        return new StoredPaths(directory.resolve(HEADER_FILE), directory.resolve(BODY_FILE));
     }
 }

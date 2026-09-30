@@ -46,12 +46,9 @@ public class SqliteMetadataAdapter implements MetadataStorage {
         statement.setString(2, book.title());
         statement.setString(3, book.author());
         statement.setString(4, book.language());
-        statement.setString(5, portable(book.path()));
+        statement.setString(5, PortablePaths.of(book.path()));
     }
 
-    private static String portable(Path path) {
-        return path.toString().replace(path.getFileSystem().getSeparator(), "/");
-    }
 
     private Connection connection() throws SQLException {
         createParentDirectory();

@@ -3,18 +3,12 @@ package org.ulpgc.tarantino.indexer.benchmarking;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.ulpgc.tarantino.indexer.IndexerConfig;
-import org.ulpgc.tarantino.indexer.IndexerFactory;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 
-import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -29,14 +23,6 @@ public class IndexingBenchmark {
     @Param({"100", "1000", "10000"})
     public int books;
 
-    private InvertedIndexStorage invertedIndex;
-
-    @Setup(Level.Trial)
-    public void setUp() {
-        Path datamarts = Path.of("benchmarks", "tmp", "datamarts-" + index + "-" + books);
-        invertedIndex = IndexerFactory.invertedIndex(config(datamarts));
-    }
-
     @Benchmark
     public void fullIndexBuild() {
         throw new UnsupportedOperationException("Not implemented yet: add every book to an empty index and flush");
@@ -45,11 +31,5 @@ public class IndexingBenchmark {
     @Benchmark
     public void incrementalUpdate() {
         throw new UnsupportedOperationException("Not implemented yet: add a fixed batch of new books to an index that already holds `books`");
-    }
-
-    private IndexerConfig config(Path datamarts) {
-        return new IndexerConfig(Path.of("datalake"), "time", datamarts, index, "sqlite",
-                System.getenv().getOrDefault("TARANTINO_MONGO_URI", "mongodb://localhost:27017"),
-                Path.of("workload"));
     }
 }

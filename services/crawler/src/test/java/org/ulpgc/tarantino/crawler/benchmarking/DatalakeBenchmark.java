@@ -3,18 +3,12 @@ package org.ulpgc.tarantino.crawler.benchmarking;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.ulpgc.tarantino.crawler.CrawlerConfig;
-import org.ulpgc.tarantino.crawler.CrawlerFactory;
-import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
-import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -28,14 +22,6 @@ public class DatalakeBenchmark {
 
     @Param({"100", "1000", "10000"})
     public int books;
-
-    private DatalakeStorage datalake;
-
-    @Setup(Level.Trial)
-    public void setUp() {
-        Path root = Path.of("benchmarks", "tmp", "datalake-" + layout + "-" + books);
-        datalake = CrawlerFactory.datalake(new CrawlerConfig(root, layout));
-    }
 
     @Benchmark
     public void writeThroughput() {
