@@ -1,4 +1,4 @@
-package org.ulpgc.tarantino.indexer.ports;
+package org.ulpgc.tarantino.query.ports;
 
 import java.util.Set;
 

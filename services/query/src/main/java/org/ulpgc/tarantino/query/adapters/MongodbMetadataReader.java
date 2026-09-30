@@ -6,7 +6,6 @@ import org.ulpgc.tarantino.query.ports.MetadataReader;
 import java.util.List;
 import java.util.Optional;
 
-/** Reads {@code tarantino.books} */
 public class MongodbMetadataReader implements MetadataReader {
 
     private final String connectionUri;
@@ -16,12 +15,12 @@ public class MongodbMetadataReader implements MetadataReader {
     }
 
     @Override
-    public Optional<BookMetadata> findById(int bookId) {
-        throw new UnsupportedOperationException("TODO");
+    public Optional<BookMetadata> book(int bookId) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     @Override
-    public List<BookMetadata> findByAuthor(String author) {
-        throw new UnsupportedOperationException("TODO");
+    public List<BookMetadata> booksBy(String author) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

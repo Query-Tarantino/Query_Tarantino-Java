@@ -14,11 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Reads {@code datamarts/metadata.db} */
 public class SqliteMetadataReader implements MetadataReader {
 
-    private static final String BY_ID = "SELECT book_id, title, author, language, path FROM books WHERE book_id = ?";
-    private static final String BY_AUTHOR =
+    private static final String BOOK_BY_ID = "SELECT book_id, title, author, language, path FROM books WHERE book_id = ?";
+    private static final String BOOKS_BY_AUTHOR =
             "SELECT book_id, title, author, language, path FROM books WHERE author LIKE ? ORDER BY book_id";
 
     private final Path database;
@@ -28,39 +27,44 @@ public class SqliteMetadataReader implements MetadataReader {
     }
 
     @Override
-    public Optional<BookMetadata> findById(int bookId) {
-        List<BookMetadata> books = query(BY_ID, statement -> statement.setInt(1, bookId));
-        return books.stream().findFirst();
+    public Optional<BookMetadata> book(int bookId) {
+        return books(BOOK_BY_ID, statement -> statement.setInt(1, bookId)).stream().findFirst();
     }
 
-    /** Case-insensitive substring match on the author name. */
     @Override
-    public List<BookMetadata> findByAuthor(String author) {
-        return query(BY_AUTHOR, statement -> statement.setString(1, "%" + author + "%"));
+    public List<BookMetadata> booksBy(String author) {
+        return books(BOOKS_BY_AUTHOR, statement -> statement.setString(1, "%" + author + "%"));
     }
 
-    private List<BookMetadata> query(String sql, Binder binder) {
-        if (!Files.exists(database)) {
-            return List.of();
-        }
+    private List<BookMetadata> books(String sql, Parameters parameters) {
+        return Files.exists(database) ? queriedBooks(sql, parameters) : List.of();
+    }
+
+    private List<BookMetadata> queriedBooks(String sql, Parameters parameters) {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            binder.bind(statement);
-            List<BookMetadata> books = new ArrayList<>();
-            try (ResultSet rows = statement.executeQuery()) {
-                while (rows.next()) {
-                    books.add(new BookMetadata(rows.getInt("book_id"), rows.getString("title"),
-                            rows.getString("author"), rows.getString("language"), Path.of(rows.getString("path"))));
-                }
-            }
-            return books;
+            parameters.bindTo(statement);
+            return booksIn(statement.executeQuery());
         } catch (SQLException e) {
             throw new IllegalStateException("Could not query " + database, e);
         }
     }
 
+    private static List<BookMetadata> booksIn(ResultSet rows) throws SQLException {
+        List<BookMetadata> books = new ArrayList<>();
+        while (rows.next()) {
+            books.add(bookAt(rows));
+        }
+        return books;
+    }
+
+    private static BookMetadata bookAt(ResultSet row) throws SQLException {
+        return new BookMetadata(row.getInt("book_id"), row.getString("title"), row.getString("author"),
+                row.getString("language"), Path.of(row.getString("path")));
+    }
+
     @FunctionalInterface
-    private interface Binder {
-        void bind(PreparedStatement statement) throws SQLException;
+    private interface Parameters {
+        void bindTo(PreparedStatement statement) throws SQLException;
     }
 }

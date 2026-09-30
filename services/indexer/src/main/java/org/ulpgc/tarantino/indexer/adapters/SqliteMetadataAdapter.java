@@ -13,7 +13,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-/** Table {@code books(book_id, title, author, language, path)} in {@code datamarts/metadata.db} */
 public class SqliteMetadataAdapter implements MetadataStorage {
 
     private static final String CREATE_TABLE = """
@@ -34,28 +33,40 @@ public class SqliteMetadataAdapter implements MetadataStorage {
 
     @Override
     public void save(Book book) {
-        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(UPSERT)) {
-            statement.setInt(1, book.bookId());
-            statement.setString(2, book.title());
-            statement.setString(3, book.author());
-            statement.setString(4, book.language());
-            statement.setString(5, book.path().toString());
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(UPSERT)) {
+            bind(statement, book);
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Could not save metadata of book " + book.bookId(), e);
         }
     }
 
-    private Connection connect() throws SQLException {
+    private static void bind(PreparedStatement statement, Book book) throws SQLException {
+        statement.setInt(1, book.bookId());
+        statement.setString(2, book.title());
+        statement.setString(3, book.author());
+        statement.setString(4, book.language());
+        statement.setString(5, book.path().toString());
+    }
+
+    private Connection connection() throws SQLException {
+        createParentDirectory();
+        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+        createTable(connection);
+        return connection;
+    }
+
+    private void createParentDirectory() {
         try {
             Files.createDirectories(database.toAbsolutePath().getParent());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+    }
+
+    private static void createTable(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             statement.execute(CREATE_TABLE);
         }
-        return connection;
     }
 }

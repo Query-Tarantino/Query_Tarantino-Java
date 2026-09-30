@@ -1,20 +1,18 @@
 package org.ulpgc.tarantino.indexer.model;
 
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
+import java.util.function.Function;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-/**
- * Terms are maximal runs of Unicode letters, lowercased, at least {@value #MIN_LENGTH} characters long
- * and not in the stopword list. These rules must match the Python and C# implementations exactly.
- */
 public class Tokenizer {
 
     private static final Pattern TERM = Pattern.compile("\\p{L}+");
-    private static final int MIN_LENGTH = 2;
+    private static final int MIN_TERM_LENGTH = 2;
 
     private final Set<String> stopwords;
 
@@ -22,15 +20,21 @@ public class Tokenizer {
         this.stopwords = stopwords;
     }
 
-    public TermOccurrences tokenize(int bookId, String body) {
-        Map<String, Integer> frequencies = new HashMap<>();
-        Matcher matcher = TERM.matcher(body.toLowerCase(Locale.ROOT));
-        while (matcher.find()) {
-            String term = matcher.group();
-            if (term.length() >= MIN_LENGTH && !stopwords.contains(term)) {
-                frequencies.merge(term, 1, Integer::sum);
-            }
-        }
-        return new TermOccurrences(bookId, frequencies);
+    public TermOccurrences occurrences(int bookId, String body) {
+        return new TermOccurrences(bookId, frequencies(body));
+    }
+
+    private Map<String, Integer> frequencies(String body) {
+        return terms(body).collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(term -> 1)));
+    }
+
+    private Stream<String> terms(String body) {
+        return TERM.matcher(body.toLowerCase(Locale.ROOT)).results()
+                .map(MatchResult::group)
+                .filter(this::isIndexable);
+    }
+
+    private boolean isIndexable(String term) {
+        return term.length() >= MIN_TERM_LENGTH && !stopwords.contains(term);
     }
 }

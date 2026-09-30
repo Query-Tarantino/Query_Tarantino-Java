@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public interface MetadataReader {
 
-    Optional<BookMetadata> findById(int bookId);
+    Optional<BookMetadata> book(int bookId);
 
-    List<BookMetadata> findByAuthor(String author);
+    List<BookMetadata> booksBy(String author);
 }

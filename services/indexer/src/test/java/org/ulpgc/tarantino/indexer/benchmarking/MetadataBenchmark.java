@@ -17,7 +17,6 @@ import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
-/** Metadata backends (PDF 4.1): insertion speed and scalability. Query speed lives in the query service. */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -34,7 +33,6 @@ public class MetadataBenchmark {
 
     @Setup(Level.Trial)
     public void setUp() {
-        // TODO: pre-parse the headers of the first `books` ids of workload/book_ids.txt
         Path datamarts = Path.of("benchmarks", "tmp", "metadata-" + metadata + "-" + books);
         storage = IndexerFactory.metadata(new IndexerConfig(Path.of("datalake"), "time", datamarts, "json",
                 metadata, System.getenv().getOrDefault("TARANTINO_MONGO_URI", "mongodb://localhost:27017"),
@@ -42,7 +40,7 @@ public class MetadataBenchmark {
     }
 
     @Benchmark
-    public void insertAll() {
-        // TODO: save every parsed book
+    public void bulkInsertion() {
+        throw new UnsupportedOperationException("Not implemented yet: save every parsed book");
     }
 }

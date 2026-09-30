@@ -1,6 +1,6 @@
-package org.ulpgc.tarantino.indexer.adapters;
+package org.ulpgc.tarantino.query.adapters;
 
-import org.ulpgc.tarantino.indexer.ports.StopwordsLoader;
+import org.ulpgc.tarantino.query.ports.StopwordsLoader;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

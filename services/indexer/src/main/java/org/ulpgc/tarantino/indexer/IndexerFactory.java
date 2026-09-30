@@ -16,40 +16,52 @@ import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
 import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+
 public final class IndexerFactory {
+
+    private static final Map<String, Function<IndexerConfig, DatalakeReader>> DATALAKE_LAYOUTS = Map.of(
+            "time", config -> new TimeBasedDatalakeReader(config.datalake()),
+            "book", config -> new BookBasedDatalakeReader(config.datalake()),
+            "batch", config -> new BatchBasedDatalakeReader(config.datalake()));
+
+    private static final Map<String, Function<IndexerConfig, InvertedIndexStorage>> INDEX_STRUCTURES = Map.of(
+            "json", config -> new MonolithicJsonIndexAdapter(config.datamarts().resolve("inverted_index.json")),
+            "folders", config -> new FolderPerTermIndexAdapter(config.datamarts().resolve("inverted_index")),
+            "mongo", config -> new MongodbIndexAdapter(config.mongoUri()));
+
+    private static final Map<String, Function<IndexerConfig, MetadataStorage>> METADATA_BACKENDS = Map.of(
+            "sqlite", config -> new SqliteMetadataAdapter(config.datamarts().resolve("metadata.db")),
+            "mongo", config -> new MongodbMetadataAdapter(config.mongoUri()));
 
     private IndexerFactory() {
     }
 
     public static IndexBookCommand indexCommand(IndexerConfig config) {
-        Tokenizer tokenizer = new Tokenizer(new FileStopwordsLoader(config.workload().resolve("stopwords.txt")).load());
-        return new IndexBookCommand(datalakeReader(config), new HeaderParser(), tokenizer,
+        return new IndexBookCommand(datalakeReader(config), new HeaderParser(), tokenizer(config),
                 invertedIndex(config), metadata(config));
     }
 
     public static DatalakeReader datalakeReader(IndexerConfig config) {
-        return switch (config.datalakeLayout()) {
-            case "time" -> new TimeBasedDatalakeReader(config.datalake());
-            case "book" -> new BookBasedDatalakeReader(config.datalake());
-            case "batch" -> new BatchBasedDatalakeReader(config.datalake());
-            default -> throw new IllegalArgumentException("Unknown datalake layout: " + config.datalakeLayout());
-        };
+        return option(DATALAKE_LAYOUTS, config.datalakeLayout(), "datalake layout").apply(config);
     }
 
     public static InvertedIndexStorage invertedIndex(IndexerConfig config) {
-        return switch (config.index()) {
-            case "json" -> new MonolithicJsonIndexAdapter(config.datamarts().resolve("inverted_index.json"));
-            case "folders" -> new FolderPerTermIndexAdapter(config.datamarts().resolve("inverted_index"));
-            case "mongo" -> new MongodbIndexAdapter(config.mongoUri());
-            default -> throw new IllegalArgumentException("Unknown index structure: " + config.index());
-        };
+        return option(INDEX_STRUCTURES, config.index(), "index structure").apply(config);
     }
 
     public static MetadataStorage metadata(IndexerConfig config) {
-        return switch (config.metadata()) {
-            case "sqlite" -> new SqliteMetadataAdapter(config.datamarts().resolve("metadata.db"));
-            case "mongo" -> new MongodbMetadataAdapter(config.mongoUri());
-            default -> throw new IllegalArgumentException("Unknown metadata backend: " + config.metadata());
-        };
+        return option(METADATA_BACKENDS, config.metadata(), "metadata backend").apply(config);
+    }
+
+    private static Tokenizer tokenizer(IndexerConfig config) {
+        return new Tokenizer(new FileStopwordsLoader(config.workload().resolve("stopwords.txt")).stopwords());
+    }
+
+    private static <T> T option(Map<String, T> options, String name, String kind) {
+        return Optional.ofNullable(options.get(name))
+                .orElseThrow(() -> new IllegalArgumentException("Unknown " + kind + ": " + name));
     }
 }

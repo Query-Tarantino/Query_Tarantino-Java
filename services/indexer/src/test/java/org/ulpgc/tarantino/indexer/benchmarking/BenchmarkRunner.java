@@ -9,20 +9,20 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Entry point for {@code mvn test -Pbenchmark}; writes results to {@code benchmarks/indexer/}. */
 public class BenchmarkRunner {
 
     public static void main(String[] args) throws Exception {
         Path output = Path.of(System.getenv().getOrDefault("TARANTINO_BENCHMARKS", "benchmarks"), "indexer");
         Files.createDirectories(output);
+        new Runner(options(output)).run();
+    }
 
-        // TODO: convert jmh-results.csv to the shared format: language,structure,metric,n_books,value
-        Options options = new OptionsBuilder()
+    private static Options options(Path output) {
+        return new OptionsBuilder()
                 .include("org.ulpgc.tarantino.indexer.benchmarking.")
                 .addProfiler(GCProfiler.class)
                 .resultFormat(ResultFormatType.CSV)
                 .result(output.resolve("jmh-results.csv").toString())
                 .build();
-        new Runner(options).run();
     }
 }

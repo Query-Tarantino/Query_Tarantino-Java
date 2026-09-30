@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 
-/** Reads {@code datamarts/inverted_index.json}; the whole file is loaded on first use. */
 public class MonolithicJsonIndexReader implements InvertedIndexReader {
 
     private static final TypeReference<Map<String, Set<Integer>>> INDEX_TYPE = new TypeReference<>() {
@@ -31,12 +30,16 @@ public class MonolithicJsonIndexReader implements InvertedIndexReader {
 
     private Map<String, Set<Integer>> index() {
         if (index == null) {
-            try {
-                index = Files.exists(file) ? new ObjectMapper().readValue(file.toFile(), INDEX_TYPE) : Map.of();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            index = Files.exists(file) ? storedIndex() : Map.of();
         }
         return index;
+    }
+
+    private Map<String, Set<Integer>> storedIndex() {
+        try {
+            return new ObjectMapper().readValue(file.toFile(), INDEX_TYPE);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

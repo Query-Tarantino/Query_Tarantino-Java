@@ -15,6 +15,7 @@ import java.time.Duration;
 public class GutenbergHttpDownloader implements BookDownloader {
 
     private static final String URL_TEMPLATE = "https://www.gutenberg.org/cache/epub/%d/pg%d.txt";
+    private static final String USER_AGENT = "query-tarantino/1.0 (ULPGC Big Data course project)";
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient client = HttpClient.newBuilder()
@@ -23,25 +24,37 @@ public class GutenbergHttpDownloader implements BookDownloader {
             .build();
 
     @Override
-    public String download(int bookId) throws DownloadException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(URL_TEMPLATE.formatted(bookId, bookId)))
+    public String rawText(int bookId) throws DownloadException {
+        return body(response(request(bookId), bookId), bookId);
+    }
+
+    private static HttpRequest request(int bookId) {
+        return HttpRequest.newBuilder(URI.create(URL_TEMPLATE.formatted(bookId, bookId)))
                 .timeout(TIMEOUT)
-                .header("User-Agent", "query-tarantino/1.0 (ULPGC Big Data course project)")
-                .GET()
+                .header("User-Agent", USER_AGENT)
                 .build();
+    }
+
+    private HttpResponse<String> response(HttpRequest request, int bookId) {
         try {
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return switch (response.statusCode()) {
-                case 200 -> response.body();
-                case 404 -> throw new DownloadException(FailureReason.NOT_FOUND, "Book " + bookId + " not found");
-                default -> throw new DownloadException(FailureReason.NETWORK_ERROR,
-                        "Unexpected HTTP " + response.statusCode() + " for book " + bookId);
-            };
-        } catch (IOException e) {
-            throw new DownloadException(FailureReason.NETWORK_ERROR, "Could not download book " + bookId + ": " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new DownloadException(FailureReason.NETWORK_ERROR, "Interrupted while downloading book " + bookId);
+            return client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (IOException | InterruptedException e) {
+            restoreInterruption(e);
+            throw new DownloadException(FailureReason.NETWORK_ERROR, "Could not download book " + bookId + ": " + e);
         }
+    }
+
+    private static void restoreInterruption(Exception e) {
+        if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String body(HttpResponse<String> response, int bookId) {
+        return switch (response.statusCode()) {
+            case 200 -> response.body();
+            case 404 -> throw new DownloadException(FailureReason.NOT_FOUND, "Book " + bookId + " not found");
+            default -> throw new DownloadException(FailureReason.NETWORK_ERROR, "HTTP " + response.statusCode() + " for book " + bookId);
+        };
     }
 }

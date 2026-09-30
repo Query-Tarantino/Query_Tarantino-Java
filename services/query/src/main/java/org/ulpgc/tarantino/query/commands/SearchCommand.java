@@ -23,28 +23,26 @@ public class SearchCommand {
         this.stopwords = stopwords;
     }
 
-    /** Returns the books that contain every term of the query (AND semantics), ordered by id. */
     public SearchResult execute(String query) {
-        Set<String> terms = QueryTerms.of(query, stopwords);
-        if (terms.isEmpty()) {
-            return new SearchResult(query, List.of());
-        }
-        TreeSet<Integer> matches = null;
-        for (String term : terms) {
-            Set<Integer> postings = invertedIndex.postings(term);
-            if (matches == null) {
-                matches = new TreeSet<>(postings);
-            } else {
-                matches.retainAll(postings);
-            }
-            if (matches.isEmpty()) {
-                break;
-            }
-        }
-        List<BookMetadata> books = matches.stream()
-                .map(metadata::findById)
+        return new SearchResult(query, booksContainingAll(QueryTerms.of(query, stopwords)));
+    }
+
+    private List<BookMetadata> booksContainingAll(Set<String> terms) {
+        return idsContainingAll(terms).stream()
+                .map(metadata::book)
                 .flatMap(Optional::stream)
                 .toList();
-        return new SearchResult(query, books);
+    }
+
+    private TreeSet<Integer> idsContainingAll(Set<String> terms) {
+        return terms.stream()
+                .map(term -> new TreeSet<>(invertedIndex.postings(term)))
+                .reduce(SearchCommand::intersection)
+                .orElseGet(TreeSet::new);
+    }
+
+    private static TreeSet<Integer> intersection(TreeSet<Integer> ids, TreeSet<Integer> others) {
+        ids.retainAll(others);
+        return ids;
     }
 }

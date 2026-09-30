@@ -34,11 +34,11 @@ class TimeBasedDatalakeAdapterTest {
     }
 
     @Test
-    void locatesAStoredBookAndIgnoresUnknownIds() {
+    void findsPathsOfStoredBooksOnly() {
         TimeBasedDatalakeAdapter datalake = new TimeBasedDatalakeAdapter(root, clock);
         StoredPaths stored = datalake.save(new BookText(5, "header", "body"));
 
-        assertEquals(Optional.of(stored), datalake.locate(5));
-        assertTrue(datalake.locate(6).isEmpty());
+        assertEquals(Optional.of(stored), datalake.pathsOf(5));
+        assertTrue(datalake.pathsOf(6).isEmpty());
     }
 }

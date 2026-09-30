@@ -5,7 +5,6 @@ import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 
 import java.nio.file.Path;
 
-/** Layout: {@code datamarts/inverted_index/<FIRST_LETTER>/<term>.txt}, one bookId per line */
 public class FolderPerTermIndexAdapter implements InvertedIndexStorage {
 
     private final Path root;
@@ -16,11 +15,11 @@ public class FolderPerTermIndexAdapter implements InvertedIndexStorage {
 
     @Override
     public void add(TermOccurrences occurrences) {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     @Override
     public void flush() {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

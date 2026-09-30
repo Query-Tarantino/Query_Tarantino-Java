@@ -1,81 +1,66 @@
 package org.ulpgc.tarantino.control.commands;
 
 import org.ulpgc.tarantino.control.model.NextStep;
+import org.ulpgc.tarantino.control.model.Outcome;
+import org.ulpgc.tarantino.control.model.StepReport;
 import org.ulpgc.tarantino.control.ports.ControlStateStore;
-import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
-import org.ulpgc.tarantino.crawler.commands.IngestResult;
-import org.ulpgc.tarantino.indexer.commands.IndexBookCommand;
-import org.ulpgc.tarantino.indexer.commands.IndexResult;
+import org.ulpgc.tarantino.control.ports.Crawler;
+import org.ulpgc.tarantino.control.ports.Indexer;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.IntConsumer;
 
-/**
- * Decides and runs one step at a time: index pending books first, otherwise download the next candidate.
- * Control files are updated only after a command succeeds, so an interrupted run resumes without losing work.
- */
 public class ControlPipeline {
 
     private final ControlStateStore state;
-    private final IngestBookCommand ingest;
-    private final IndexBookCommand index;
+    private final Crawler crawler;
+    private final Indexer indexer;
     private final List<Integer> candidates;
     private final Set<Integer> failed = new HashSet<>();
 
-    public ControlPipeline(ControlStateStore state, IngestBookCommand ingest, IndexBookCommand index,
-                           List<Integer> candidates) {
+    public ControlPipeline(ControlStateStore state, Crawler crawler, Indexer indexer, List<Integer> candidates) {
         this.state = state;
-        this.ingest = ingest;
-        this.index = index;
+        this.crawler = crawler;
+        this.indexer = indexer;
         this.candidates = candidates;
     }
 
-    public NextStep next() {
+    public NextStep nextStep() {
         Set<Integer> downloaded = state.downloaded();
-        Set<Integer> indexed = state.indexed();
-        for (int bookId : downloaded) {
-            if (!indexed.contains(bookId) && !failed.contains(bookId)) {
-                return new NextStep(NextStep.Action.INDEX, bookId);
-            }
-        }
-        for (int bookId : candidates) {
-            if (!downloaded.contains(bookId) && !failed.contains(bookId)) {
-                return new NextStep(NextStep.Action.DOWNLOAD, bookId);
-            }
-        }
-        return new NextStep(NextStep.Action.IDLE, 0);
+        return firstPending(downloaded, state.indexed()).map(NextStep::index)
+                .or(() -> firstPending(candidates, downloaded).map(NextStep::download))
+                .orElseGet(NextStep::idle);
     }
 
-    public NextStep runStep() {
-        NextStep step = next();
-        switch (step.action()) {
-            case INDEX -> {
-                IndexResult result = index.execute(step.bookId());
-                if (result.indexed()) {
-                    state.markIndexed(step.bookId());
-                    log("Book %d indexed (%d unique terms)", step.bookId(), result.uniqueTerms());
-                } else {
-                    failed.add(step.bookId());
-                    log("Book %d could not be indexed: not found in the datalake", step.bookId());
-                }
-            }
-            case DOWNLOAD -> {
-                IngestResult result = ingest.execute(step.bookId());
-                if (result.succeeded()) {
-                    state.markDownloaded(step.bookId());
-                    log("Book %d downloaded to %s", step.bookId(), result.paths().body().getParent());
-                } else {
-                    failed.add(step.bookId());
-                    log("Book %d skipped: %s", step.bookId(), result.failure());
-                }
-            }
-            case IDLE -> log("Nothing left to do");
-        }
-        return step;
+    public StepReport runStep() {
+        NextStep step = nextStep();
+        return new StepReport(step, outcome(step));
     }
 
-    private static void log(String format, Object... arguments) {
-        System.out.println("[CONTROL] " + format.formatted(arguments));
+    private Optional<Integer> firstPending(Collection<Integer> ids, Set<Integer> done) {
+        return ids.stream()
+                .filter(id -> !done.contains(id) && !failed.contains(id))
+                .findFirst();
+    }
+
+    private Outcome outcome(NextStep step) {
+        return switch (step.action()) {
+            case INDEX -> register(step, indexer.index(step.bookId()), state::markIndexed);
+            case DOWNLOAD -> register(step, crawler.ingest(step.bookId()), state::markDownloaded);
+            case IDLE -> Outcome.success("nothing left to do");
+        };
+    }
+
+    private Outcome register(NextStep step, Outcome outcome, IntConsumer markDone) {
+        if (outcome.succeeded()) {
+            markDone.accept(step.bookId());
+        } else {
+            failed.add(step.bookId());
+        }
+        return outcome;
     }
 }

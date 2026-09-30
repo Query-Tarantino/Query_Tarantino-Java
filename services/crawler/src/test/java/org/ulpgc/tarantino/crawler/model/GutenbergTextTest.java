@@ -21,7 +21,7 @@ class GutenbergTextTest {
 
     @Test
     void splitsHeaderAndBodyDiscardingMarkersAndFooter() {
-        BookText book = GutenbergText.split(1342, RAW);
+        BookText book = GutenbergText.bookText(1342, RAW);
 
         assertEquals(1342, book.bookId());
         assertEquals("Title: Pride and Prejudice\nAuthor: Jane Austen", book.header());
@@ -32,12 +32,12 @@ class GutenbergTextTest {
     void acceptsLegacyThisMarkers() {
         String raw = "Header\n*** START OF THIS PROJECT GUTENBERG EBOOK X ***\nBody\n*** END OF THIS PROJECT GUTENBERG EBOOK X ***";
 
-        assertEquals("Body", GutenbergText.split(1, raw).body());
+        assertEquals("Body", GutenbergText.bookText(1, raw).body());
     }
 
     @Test
     void failsWhenMarkersAreMissing() {
-        DownloadException error = assertThrows(DownloadException.class, () -> GutenbergText.split(1, "no markers"));
+        DownloadException error = assertThrows(DownloadException.class, () -> GutenbergText.bookText(1, "no markers"));
 
         assertEquals(FailureReason.MISSING_MARKERS, error.reason());
     }
