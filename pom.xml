@@ -20,9 +20,9 @@
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <sqlite-jdbc.version>3.47.1.0</sqlite-jdbc.version>
-        <mongodb-driver.version>5.2.1</mongodb-driver.version>
-        <jackson.version>2.18.2</jackson.version>
+        <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
+        <mongodb-driver.version>5.13.0</mongodb-driver.version>
+        <jackson.version>2.22.3</jackson.version>
         <jmh.version>1.37</jmh.version>
         <junit.version>5.11.4</junit.version>
 
@@ -54,9 +54,11 @@
                 <version>${mongodb-driver.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
                 <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>org.openjdk.jmh</groupId>
