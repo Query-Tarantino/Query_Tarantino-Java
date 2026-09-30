@@ -64,7 +64,7 @@ public class FileControlStateStore implements ControlStateStore {
     private static void append(Path file, int bookId) {
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
-            Files.writeString(file, bookId + System.lineSeparator(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Files.writeString(file, bookId + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

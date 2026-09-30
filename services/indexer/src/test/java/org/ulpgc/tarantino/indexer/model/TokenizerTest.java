@@ -25,4 +25,11 @@ class TokenizerTest {
 
         assertEquals(Map.of("café", 1, "don", 1, "year", 1), occurrences.frequencies());
     }
+
+    @Test
+    void measuresTermLengthInCodePoints() {
+        TermOccurrences occurrences = tokenizer.occurrences(5, "\uD835\uDC9C \uD835\uDC9C\uD835\uDC9C");
+
+        assertEquals(Map.of("\uD835\uDC9C\uD835\uDC9C", 1), occurrences.frequencies());
+    }
 }

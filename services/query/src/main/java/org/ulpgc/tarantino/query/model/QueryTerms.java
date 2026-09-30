@@ -18,7 +18,11 @@ public final class QueryTerms {
     public static Set<String> of(String query, Set<String> stopwords) {
         return TERM.matcher(query.toLowerCase(Locale.ROOT)).results()
                 .map(MatchResult::group)
-                .filter(term -> term.length() >= MIN_TERM_LENGTH && !stopwords.contains(term))
+                .filter(term -> isSearchable(term, stopwords))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static boolean isSearchable(String term, Set<String> stopwords) {
+        return term.codePointCount(0, term.length()) >= MIN_TERM_LENGTH && !stopwords.contains(term);
     }
 }

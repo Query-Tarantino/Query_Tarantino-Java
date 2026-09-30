@@ -35,6 +35,6 @@ public class Tokenizer {
     }
 
     private boolean isIndexable(String term) {
-        return term.length() >= MIN_TERM_LENGTH && !stopwords.contains(term);
+        return term.codePointCount(0, term.length()) >= MIN_TERM_LENGTH && !stopwords.contains(term);
     }
 }

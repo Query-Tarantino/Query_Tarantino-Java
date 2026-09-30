@@ -4,6 +4,9 @@ Java implementation of the data layer of a search engine over [Project Gutenberg
 a **datalake** with the raw texts, **datamarts** with metadata and an inverted index, and a minimal **control layer**
 that coordinates downloading and indexing.
 
+The behavior shared with the Python and C# implementations (split rules, datalake layouts, tokenizer,
+datamart formats, control algorithm and benchmark format) is defined in [SPEC.md](SPEC.md).
+
 ## Repository structure
 
 ```
@@ -88,7 +91,8 @@ mvn test -Pbenchmark                          # every service
 mvn -pl services/crawler test -Pbenchmark     # a single service
 ```
 
-Results are written to `benchmarks/<service>/jmh-results.csv`.
+Raw JMH results are written to `benchmarks/<service>/jmh-results.csv`, and the results shared with
+the other languages to `benchmarks/results/java-<service>.csv` (format in [SPEC.md](SPEC.md#11-benchmarks)).
 
 | Comparison                  | Structures                     | Metrics                                                                 | Benchmark                         |
 |-----------------------------|--------------------------------|-------------------------------------------------------------------------|-----------------------------------|
@@ -96,8 +100,5 @@ Results are written to `benchmarks/<service>/jmh-results.csv`.
 | Inverted index (PDF 4.2)    | `json`, `mongo`, `folders`     | build time, update time, query time, memory, disk, scalability           | indexer `IndexingBenchmark`, query `QueryBenchmark` |
 | Metadata (PDF 4.1)          | `sqlite`, `mongo`              | insertion, query by author, path by id, scalability                      | indexer `MetadataBenchmark`, query `QueryBenchmark` |
 
-Rules that keep the results comparable across languages:
-
-1. **The network is never measured.** Texts are downloaded once to `benchmarks/cache/` and every benchmark reads from there.
-2. **Same workload everywhere.** All implementations use the files in `workload/` and the same tokenizer rules.
-3. **Same output format.** Results are exported as `language,structure,metric,n_books,value`.
+The rules that keep results comparable across languages (dataset, sizes, iterations, metrics and
+units) are defined in [SPEC.md](SPEC.md#11-benchmarks).
