@@ -1,6 +1,6 @@
 package org.ulpgc.tarantino.crawler.model;
 
-import java.util.regex.Matcher;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 
 public final class GutenbergText {
@@ -13,19 +13,16 @@ public final class GutenbergText {
     private GutenbergText() {
     }
 
-    /** Splits a raw Gutenberg text into header and body; the marker lines and the footer are discarded. */
-    public static BookText split(int bookId, String rawText) {
+    public static BookText bookText(int bookId, String rawText) {
         String text = rawText.replace("\r\n", "\n");
-        Matcher start = START_MARKER.matcher(text);
-        if (!start.find()) {
-            throw new DownloadException(FailureReason.MISSING_MARKERS, "Start marker not found in book " + bookId);
-        }
-        Matcher end = END_MARKER.matcher(text);
-        if (!end.find(start.end())) {
-            throw new DownloadException(FailureReason.MISSING_MARKERS, "End marker not found in book " + bookId);
-        }
-        String header = text.substring(0, start.start()).strip();
-        String body = text.substring(start.end(), end.start()).strip();
-        return new BookText(bookId, header, body);
+        MatchResult start = marker(START_MARKER, text, 0, bookId);
+        MatchResult end = marker(END_MARKER, text, start.end(), bookId);
+        return new BookText(bookId, text.substring(0, start.start()).strip(), text.substring(start.end(), end.start()).strip());
+    }
+
+    private static MatchResult marker(Pattern marker, String text, int from, int bookId) {
+        return marker.matcher(text).region(from, text.length()).results()
+                .findFirst()
+                .orElseThrow(() -> new DownloadException(FailureReason.MISSING_MARKERS, "Missing Gutenberg markers in book " + bookId));
     }
 }

@@ -17,10 +17,6 @@ import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Datalake structures (PDF 3.1). Reads raw texts from {@code benchmarks/cache/} so the
- * network is never measured. Storage overhead (files, directories) is counted, not timed.
- */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -37,23 +33,22 @@ public class DatalakeBenchmark {
 
     @Setup(Level.Trial)
     public void setUp() {
-        // TODO: load the first `books` ids of workload/book_ids.txt from benchmarks/cache/
         Path root = Path.of("benchmarks", "tmp", "datalake-" + layout + "-" + books);
         datalake = CrawlerFactory.datalake(new CrawlerConfig(root, layout));
     }
 
     @Benchmark
     public void writeThroughput() {
-        // TODO: split and save every cached book
+        throw new UnsupportedOperationException("Not implemented yet: split and save every cached book");
     }
 
     @Benchmark
     public void lookup() {
-        // TODO: locate header and body of a random stored book
+        throw new UnsupportedOperationException("Not implemented yet: locate header and body of a random stored book");
     }
 
     @Benchmark
-    public void detectNewBooks() {
-        // TODO: find books stored after a given point in time
+    public void newBooksDetection() {
+        throw new UnsupportedOperationException("Not implemented yet: find books stored after a given point in time");
     }
 }

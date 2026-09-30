@@ -4,7 +4,6 @@ import org.ulpgc.tarantino.query.ports.InvertedIndexReader;
 
 import java.util.Set;
 
-/** Reads {@code tarantino.inverted_index} */
 public class MongodbIndexReader implements InvertedIndexReader {
 
     private final String connectionUri;
@@ -15,6 +14,6 @@ public class MongodbIndexReader implements InvertedIndexReader {
 
     @Override
     public Set<Integer> postings(String term) {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

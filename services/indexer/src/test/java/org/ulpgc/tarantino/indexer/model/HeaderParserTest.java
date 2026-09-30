@@ -23,14 +23,14 @@ class HeaderParserTest {
                 Language: English
                 """;
 
-        Book book = parser.parse(new BookText(5, header, "", body));
+        Book book = parser.book(new BookText(5, header, "", body));
 
         assertEquals(new Book(5, "Robinson Crusoe", "Daniel Defoe", "English", body), book);
     }
 
     @Test
     void leavesMissingFieldsAsNull() {
-        Book book = parser.parse(new BookText(5, "Title: Only a title", "", body));
+        Book book = parser.book(new BookText(5, "Title: Only a title", "", body));
 
         assertEquals("Only a title", book.title());
         assertNull(book.author());

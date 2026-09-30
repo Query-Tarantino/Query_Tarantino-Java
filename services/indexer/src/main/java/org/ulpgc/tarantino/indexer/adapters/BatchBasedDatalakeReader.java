@@ -6,7 +6,6 @@ import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** Layout: {@code datalake/<id / BATCH_SIZE>/<id>.header.txt + <id>.body.txt} */
 public class BatchBasedDatalakeReader implements DatalakeReader {
 
     private final Path root;
@@ -16,7 +15,7 @@ public class BatchBasedDatalakeReader implements DatalakeReader {
     }
 
     @Override
-    public Optional<BookText> read(int bookId) {
-        throw new UnsupportedOperationException("TODO");
+    public Optional<BookText> bookText(int bookId) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

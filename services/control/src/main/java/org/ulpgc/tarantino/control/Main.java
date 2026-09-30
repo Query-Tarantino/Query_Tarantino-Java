@@ -1,35 +1,61 @@
 package org.ulpgc.tarantino.control;
 
 import org.ulpgc.tarantino.control.adapters.FileControlStateStore;
+import org.ulpgc.tarantino.control.adapters.LocalCrawler;
+import org.ulpgc.tarantino.control.adapters.LocalIndexer;
 import org.ulpgc.tarantino.control.commands.ControlPipeline;
-import org.ulpgc.tarantino.control.model.NextStep;
+import org.ulpgc.tarantino.control.model.StepReport;
 import org.ulpgc.tarantino.crawler.CrawlerConfig;
 import org.ulpgc.tarantino.crawler.CrawlerFactory;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
 import org.ulpgc.tarantino.indexer.IndexerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class Main {
 
-    public static void main(String[] args) throws IOException {
+    private static final String DEFAULT_CANDIDATES = "sample_ids.txt";
+
+    public static void main(String[] args) {
         ControlConfig config = ControlConfig.fromEnvironment();
-        String idsFile = args.length > 0 ? args[0] : "sample_ids.txt";
-        List<Integer> candidates = Files.readAllLines(config.workload().resolve(idsFile)).stream()
-                .filter(line -> !line.isBlank())
-                .map(line -> Integer.parseInt(line.strip()))
+        ControlPipeline pipeline = pipeline(config, candidatesFile(config, args));
+        Stream.generate(pipeline::runStep).takeWhile(report -> !report.idle()).forEach(Main::print);
+        System.out.println("[CONTROL] Nothing left to do");
+    }
+
+    private static ControlPipeline pipeline(ControlConfig config, Path candidatesFile) {
+        return new ControlPipeline(new FileControlStateStore(config.control()),
+                new LocalCrawler(CrawlerFactory.ingestCommand(CrawlerConfig.fromEnvironment())),
+                new LocalIndexer(IndexerFactory.indexCommand(IndexerConfig.fromEnvironment())),
+                candidates(candidatesFile));
+    }
+
+    private static Path candidatesFile(ControlConfig config, String[] args) {
+        return config.workload().resolve(args.length > 0 ? args[0] : DEFAULT_CANDIDATES);
+    }
+
+    private static List<Integer> candidates(Path file) {
+        return lines(file).stream()
+                .map(String::strip)
+                .filter(line -> !line.isEmpty())
+                .map(Integer::valueOf)
                 .toList();
+    }
 
-        ControlPipeline pipeline = new ControlPipeline(
-                new FileControlStateStore(config.control()),
-                CrawlerFactory.ingestCommand(CrawlerConfig.fromEnvironment()),
-                IndexerFactory.indexCommand(IndexerConfig.fromEnvironment()),
-                candidates);
-
-        while (pipeline.runStep().action() != NextStep.Action.IDLE) {
-            // each step logs its own outcome
+    private static List<String> lines(Path file) {
+        try {
+            return Files.readAllLines(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
+    }
+
+    private static void print(StepReport report) {
+        System.out.println("[CONTROL] " + report.description());
     }
 }

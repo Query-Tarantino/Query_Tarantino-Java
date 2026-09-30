@@ -7,7 +7,6 @@ import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** Layout: {@code datalake/<id>/header.txt + body.txt} */
 public class BookBasedDatalakeAdapter implements DatalakeStorage {
 
     private final Path root;
@@ -18,11 +17,11 @@ public class BookBasedDatalakeAdapter implements DatalakeStorage {
 
     @Override
     public StoredPaths save(BookText book) {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     @Override
-    public Optional<StoredPaths> locate(int bookId) {
-        throw new UnsupportedOperationException("TODO");
+    public Optional<StoredPaths> pathsOf(int bookId) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

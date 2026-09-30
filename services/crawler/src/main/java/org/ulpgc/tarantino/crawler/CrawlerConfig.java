@@ -6,11 +6,11 @@ public record CrawlerConfig(Path datalake, String datalakeLayout) {
 
     public static CrawlerConfig fromEnvironment() {
         return new CrawlerConfig(
-                Path.of(env("TARANTINO_DATALAKE", "datalake")),
-                env("TARANTINO_DATALAKE_LAYOUT", "time"));
+                Path.of(variable("TARANTINO_DATALAKE", "datalake")),
+                variable("TARANTINO_DATALAKE_LAYOUT", "time"));
     }
 
-    private static String env(String name, String defaultValue) {
+    private static String variable(String name, String defaultValue) {
         return System.getenv().getOrDefault(name, defaultValue);
     }
 }

@@ -17,7 +17,6 @@ import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
-/** Inverted index structures (PDF 4.2). Memory comes from the GC profiler; disk usage is measured after the run. */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -34,19 +33,18 @@ public class IndexingBenchmark {
 
     @Setup(Level.Trial)
     public void setUp() {
-        // TODO: pre-tokenize the first `books` ids of workload/book_ids.txt
         Path datamarts = Path.of("benchmarks", "tmp", "datamarts-" + index + "-" + books);
         invertedIndex = IndexerFactory.invertedIndex(config(datamarts));
     }
 
     @Benchmark
-    public void buildIndex() {
-        // TODO: add every book to an empty index and flush
+    public void fullIndexBuild() {
+        throw new UnsupportedOperationException("Not implemented yet: add every book to an empty index and flush");
     }
 
     @Benchmark
-    public void addBooksToExistingIndex() {
-        // TODO: add a fixed batch of new books to an index that already holds `books`
+    public void incrementalUpdate() {
+        throw new UnsupportedOperationException("Not implemented yet: add a fixed batch of new books to an index that already holds `books`");
     }
 
     private IndexerConfig config(Path datamarts) {

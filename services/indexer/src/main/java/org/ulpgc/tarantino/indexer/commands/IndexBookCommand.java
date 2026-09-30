@@ -8,8 +8,6 @@ import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
 import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
 import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
 
-import java.util.Optional;
-
 public class IndexBookCommand {
 
     private final DatalakeReader datalake;
@@ -27,16 +25,21 @@ public class IndexBookCommand {
         this.metadata = metadata;
     }
 
-    /** Idempotent: re-indexing a book overwrites its metadata and adds no duplicate postings. */
     public IndexResult execute(int bookId) {
-        Optional<BookText> text = datalake.read(bookId);
-        if (text.isEmpty()) {
-            return new IndexResult(bookId, false, 0);
-        }
-        metadata.save(headerParser.parse(text.get()));
-        TermOccurrences occurrences = tokenizer.tokenize(bookId, text.get().body());
+        return datalake.bookText(bookId)
+                .map(this::index)
+                .orElseGet(() -> IndexResult.notFound(bookId));
+    }
+
+    private IndexResult index(BookText text) {
+        metadata.save(headerParser.book(text));
+        TermOccurrences occurrences = tokenizer.occurrences(text.bookId(), text.body());
+        store(occurrences);
+        return IndexResult.success(text.bookId(), occurrences.frequencies().size());
+    }
+
+    private void store(TermOccurrences occurrences) {
         invertedIndex.add(occurrences);
         invertedIndex.flush();
-        return new IndexResult(bookId, true, occurrences.frequencies().size());
     }
 }

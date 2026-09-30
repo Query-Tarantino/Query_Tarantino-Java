@@ -15,11 +15,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/** Layout: {@code datalake/YYYYMMDD/HH/<id>.header.txt + <id>.body.txt}, hour of download in UTC. */
 public class TimeBasedDatalakeAdapter implements DatalakeStorage {
 
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH");
+    private static final DateTimeFormatter DAY_DIRECTORY = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HOUR_DIRECTORY = DateTimeFormatter.ofPattern("HH");
+    private static final String HEADER_SUFFIX = ".header.txt";
+    private static final String BODY_SUFFIX = ".body.txt";
+    private static final int BOOK_FILE_DEPTH = 3;
 
     private final Path root;
     private final Clock clock;
@@ -35,31 +37,41 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
 
     @Override
     public StoredPaths save(BookText book) {
-        LocalDateTime now = LocalDateTime.now(clock);
-        Path directory = root.resolve(DAY.format(now)).resolve(HOUR.format(now));
-        StoredPaths paths = new StoredPaths(
-                directory.resolve(book.bookId() + ".header.txt"),
-                directory.resolve(book.bookId() + ".body.txt"));
-        try {
-            Files.createDirectories(directory);
-            // The body is written last: its presence marks the book as completely stored.
-            writeAtomically(paths.header(), book.header());
-            writeAtomically(paths.body(), book.body());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        StoredPaths paths = pathsIn(currentDirectory(), book.bookId());
+        write(paths, book);
         return paths;
     }
 
     @Override
-    public Optional<StoredPaths> locate(int bookId) {
-        if (!Files.isDirectory(root)) {
-            return Optional.empty();
+    public Optional<StoredPaths> pathsOf(int bookId) {
+        return bodyFile(bookId).map(body -> pathsIn(body.getParent(), bookId));
+    }
+
+    private Path currentDirectory() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        return root.resolve(DAY_DIRECTORY.format(now)).resolve(HOUR_DIRECTORY.format(now));
+    }
+
+    private static StoredPaths pathsIn(Path directory, int bookId) {
+        return new StoredPaths(directory.resolve(bookId + HEADER_SUFFIX), directory.resolve(bookId + BODY_SUFFIX));
+    }
+
+    private Optional<Path> bodyFile(int bookId) {
+        return Files.isDirectory(root) ? firstFileNamed(bookId + BODY_SUFFIX) : Optional.empty();
+    }
+
+    private Optional<Path> firstFileNamed(String name) {
+        try (Stream<Path> files = Files.find(root, BOOK_FILE_DEPTH, (path, attributes) -> path.endsWith(name))) {
+            return files.findFirst();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        String bodyName = bookId + ".body.txt";
-        try (Stream<Path> files = Files.find(root, 3, (path, attributes) -> path.getFileName().toString().equals(bodyName))) {
-            return files.findFirst()
-                    .map(body -> new StoredPaths(body.resolveSibling(bookId + ".header.txt"), body));
+    }
+
+    private static void write(StoredPaths paths, BookText book) {
+        try {
+            writeAtomically(paths.header(), book.header());
+            writeAtomically(paths.body(), book.body());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -67,6 +79,7 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
 
     private static void writeAtomically(Path target, String content) throws IOException {
         Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
+        Files.createDirectories(target.getParent());
         Files.writeString(temporary, content);
         Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }

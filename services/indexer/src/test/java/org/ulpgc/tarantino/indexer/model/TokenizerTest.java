@@ -13,7 +13,7 @@ class TokenizerTest {
 
     @Test
     void countsLowercasedTermsWithoutStopwordsOrShortTokens() {
-        TermOccurrences occurrences = tokenizer.tokenize(5, "The Island of the island, a SHIPWRECK!");
+        TermOccurrences occurrences = tokenizer.occurrences(5, "The Island of the island, a SHIPWRECK!");
 
         assertEquals(5, occurrences.bookId());
         assertEquals(Map.of("island", 2, "shipwreck", 1), occurrences.frequencies());
@@ -21,7 +21,7 @@ class TokenizerTest {
 
     @Test
     void keepsAccentedLettersAndSplitsOnDigitsAndApostrophes() {
-        TermOccurrences occurrences = tokenizer.tokenize(5, "Café don't 1984year");
+        TermOccurrences occurrences = tokenizer.occurrences(5, "Café don't 1984year");
 
         assertEquals(Map.of("café", 1, "don", 1, "year", 1), occurrences.frequencies());
     }

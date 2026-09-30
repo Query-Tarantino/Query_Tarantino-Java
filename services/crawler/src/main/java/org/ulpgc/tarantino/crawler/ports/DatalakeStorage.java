@@ -9,5 +9,5 @@ public interface DatalakeStorage {
 
     StoredPaths save(BookText book);
 
-    Optional<StoredPaths> locate(int bookId);
+    Optional<StoredPaths> pathsOf(int bookId);
 }

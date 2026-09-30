@@ -6,11 +6,11 @@ public record ControlConfig(Path control, Path workload) {
 
     public static ControlConfig fromEnvironment() {
         return new ControlConfig(
-                Path.of(env("TARANTINO_CONTROL", "control")),
-                Path.of(env("TARANTINO_WORKLOAD", "workload")));
+                Path.of(variable("TARANTINO_CONTROL", "control")),
+                Path.of(variable("TARANTINO_WORKLOAD", "workload")));
     }
 
-    private static String env(String name, String defaultValue) {
+    private static String variable(String name, String defaultValue) {
         return System.getenv().getOrDefault(name, defaultValue);
     }
 }

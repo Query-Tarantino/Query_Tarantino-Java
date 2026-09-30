@@ -1,5 +1,6 @@
 package org.ulpgc.tarantino.query;
 
+import org.ulpgc.tarantino.query.adapters.FileStopwordsLoader;
 import org.ulpgc.tarantino.query.adapters.FolderPerTermIndexReader;
 import org.ulpgc.tarantino.query.adapters.MongodbIndexReader;
 import org.ulpgc.tarantino.query.adapters.MongodbMetadataReader;
@@ -9,14 +10,21 @@ import org.ulpgc.tarantino.query.commands.SearchCommand;
 import org.ulpgc.tarantino.query.ports.InvertedIndexReader;
 import org.ulpgc.tarantino.query.ports.MetadataReader;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
 public final class QueryFactory {
+
+    private static final Map<String, Function<QueryConfig, InvertedIndexReader>> INDEX_STRUCTURES = Map.of(
+            "json", config -> new MonolithicJsonIndexReader(config.datamarts().resolve("inverted_index.json")),
+            "folders", config -> new FolderPerTermIndexReader(config.datamarts().resolve("inverted_index")),
+            "mongo", config -> new MongodbIndexReader(config.mongoUri()));
+
+    private static final Map<String, Function<QueryConfig, MetadataReader>> METADATA_BACKENDS = Map.of(
+            "sqlite", config -> new SqliteMetadataReader(config.datamarts().resolve("metadata.db")),
+            "mongo", config -> new MongodbMetadataReader(config.mongoUri()));
 
     private QueryFactory() {
     }
@@ -26,30 +34,19 @@ public final class QueryFactory {
     }
 
     public static InvertedIndexReader invertedIndex(QueryConfig config) {
-        return switch (config.index()) {
-            case "json" -> new MonolithicJsonIndexReader(config.datamarts().resolve("inverted_index.json"));
-            case "folders" -> new FolderPerTermIndexReader(config.datamarts().resolve("inverted_index"));
-            case "mongo" -> new MongodbIndexReader(config.mongoUri());
-            default -> throw new IllegalArgumentException("Unknown index structure: " + config.index());
-        };
+        return option(INDEX_STRUCTURES, config.index(), "index structure").apply(config);
     }
 
     public static MetadataReader metadata(QueryConfig config) {
-        return switch (config.metadata()) {
-            case "sqlite" -> new SqliteMetadataReader(config.datamarts().resolve("metadata.db"));
-            case "mongo" -> new MongodbMetadataReader(config.mongoUri());
-            default -> throw new IllegalArgumentException("Unknown metadata backend: " + config.metadata());
-        };
+        return option(METADATA_BACKENDS, config.metadata(), "metadata backend").apply(config);
     }
 
     private static Set<String> stopwords(QueryConfig config) {
-        try {
-            return Files.readAllLines(config.workload().resolve("stopwords.txt")).stream()
-                    .map(line -> line.strip().toLowerCase(Locale.ROOT))
-                    .filter(line -> !line.isEmpty())
-                    .collect(Collectors.toUnmodifiableSet());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return new FileStopwordsLoader(config.workload().resolve("stopwords.txt")).stopwords();
+    }
+
+    private static <T> T option(Map<String, T> options, String name, String kind) {
+        return Optional.ofNullable(options.get(name))
+                .orElseThrow(() -> new IllegalArgumentException("Unknown " + kind + ": " + name));
     }
 }

@@ -8,11 +8,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/** Layout: {@code control/downloaded_books.txt} and {@code control/indexed_books.txt}, one bookId per line */
 public class FileControlStateStore implements ControlStateStore {
+
+    private static final Pattern BOOK_ID = Pattern.compile("\\d+");
 
     private final Path downloaded;
     private final Path indexed;
@@ -24,12 +27,12 @@ public class FileControlStateStore implements ControlStateStore {
 
     @Override
     public Set<Integer> downloaded() {
-        return read(downloaded);
+        return ids(downloaded);
     }
 
     @Override
     public Set<Integer> indexed() {
-        return read(indexed);
+        return ids(indexed);
     }
 
     @Override
@@ -42,17 +45,17 @@ public class FileControlStateStore implements ControlStateStore {
         append(indexed, bookId);
     }
 
-    /** Keeps file order; blank lines and a partially written last line are ignored. */
-    private static Set<Integer> read(Path file) {
-        if (!Files.exists(file)) {
-            return new LinkedHashSet<>();
-        }
+    private static Set<Integer> ids(Path file) {
+        return lines(file).stream()
+                .map(String::strip)
+                .filter(BOOK_ID.asMatchPredicate())
+                .map(Integer::valueOf)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static List<String> lines(Path file) {
         try {
-            return Files.readAllLines(file).stream()
-                    .map(String::strip)
-                    .filter(line -> line.matches("\\d+"))
-                    .map(Integer::valueOf)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return Files.exists(file) ? Files.readAllLines(file) : List.of();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

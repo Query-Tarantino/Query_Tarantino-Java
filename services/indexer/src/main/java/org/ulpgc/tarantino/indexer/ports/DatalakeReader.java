@@ -6,5 +6,5 @@ import java.util.Optional;
 
 public interface DatalakeReader {
 
-    Optional<BookText> read(int bookId);
+    Optional<BookText> bookText(int bookId);
 }
