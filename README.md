@@ -152,6 +152,7 @@ Every setting has a default that works when running from the project root. Overr
 | `TARANTINO_INDEX`           | `json`                      | `json`, `mongo`, `folders` |
 | `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`        |
 | `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string        |
+| `TARANTINO_INDEX_BATCH`     | `100`                       | books indexed per index flush by the control service (1 = book by book) |
 
 The crawler and the indexer must use the same `TARANTINO_DATALAKE_LAYOUT`; the indexer and the query service must use
 the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
@@ -171,7 +172,10 @@ mvn -q install -DskipTests
 Run it again after changing the code of any service.
 
 **2a. Run the whole pipeline** with the control service. It downloads and indexes every book of a
-workload file (default `workload/sample_ids.txt`) and can be interrupted and run again at any time:
+workload file (default `workload/sample_ids.txt`) and can be interrupted and run again at any time. It
+indexes in batches of `TARANTINO_INDEX_BATCH` books (100 by default) with one index write per batch, so a
+downloaded book becomes searchable when its batch is written; an interrupted batch is indexed again on the
+next run:
 
 ```bash
 mvn -q -pl services/control exec:java
@@ -182,7 +186,7 @@ mvn -q -pl services/control exec:java -Dexec.args="book_ids.txt"
 
 ```bash
 mvn -q -pl services/crawler exec:java -Dexec.args="1342 84"          # download and store books 1342 and 84
-mvn -q -pl services/indexer exec:java -Dexec.args="1342 84"          # index them
+mvn -q -pl services/indexer exec:java -Dexec.args="1342 84"          # index them, one index write for both
 mvn -q -pl services/query   exec:java -Dexec.args="adventure island" # search
 ```
 

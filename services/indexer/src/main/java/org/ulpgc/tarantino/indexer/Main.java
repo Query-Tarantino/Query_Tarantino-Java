@@ -8,6 +8,6 @@ public class Main {
 
     public static void main(String[] args) {
         IndexBookCommand index = IndexerFactory.indexCommand(IndexerConfig.fromEnvironment());
-        Arrays.stream(args).map(Integer::parseInt).map(index::execute).forEach(System.out::println);
+        index.execute(Arrays.stream(args).map(Integer::valueOf).toList()).forEach(System.out::println);
     }
 }

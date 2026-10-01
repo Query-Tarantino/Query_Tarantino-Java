@@ -7,6 +7,6 @@ public record StepReport(NextStep step, Outcome outcome) {
     }
 
     public String description() {
-        return "%s %d: %s".formatted(step.action(), step.bookId(), outcome.detail());
+        return "%s %s: %s".formatted(step.action(), step.books(), outcome.detail());
     }
 }

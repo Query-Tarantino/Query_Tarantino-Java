@@ -32,6 +32,7 @@ and SQLite page layout are free. Everything else in this document is normative.
 | `TARANTINO_INDEX`           | `json`                      | `json`, `folders`, `mongo` |
 | `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`          |
 | `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string          |
+| `TARANTINO_INDEX_BATCH`     | `100`                       | positive integer           |
 
 An unknown value is a configuration error and must stop the service with a message naming the value.
 
@@ -177,17 +178,30 @@ step costs the same however many books are already done.
 **Ingestion** of a book is idempotent: if the datalake already contains it (§6), it succeeds with the
 existing paths without downloading again.
 
+**Books to index** are the ids of `downloaded_books.txt`, in file order, that are not in
+`indexed_books.txt` and have not failed during this run. They are indexed in batches of K books,
+K = `TARANTINO_INDEX_BATCH` (100 by default).
+
 **Next step**, evaluated before every step:
 
-1. `INDEX` the first id of `downloaded_books.txt`, in file order, that is not in
-   `indexed_books.txt` and has not failed during this run.
+1. `INDEX` the first K books to index, if there are at least K, or all of them if there is at least one
+   and no candidate is left to download.
 2. Otherwise, `DOWNLOAD` the first candidate, in candidates-file order, that is not in
    `downloaded_books.txt` and has not failed during this run.
 3. Otherwise `IDLE`: the run ends.
 
-**After each step**, the id is appended to the matching state file **only if the step succeeded**.
+**After each step**, each id is appended to the matching state file **only if it succeeded**.
 A failed id is remembered in memory for the current run and retried on the next run.
-Indexing a book writes its metadata and flushes the inverted index before it is marked as indexed.
+Indexing a batch writes the metadata of each book, adds every book to the inverted index and flushes
+it **once**; only then are the books that succeeded marked as indexed. An interrupted batch marks none
+of its books, so the next run indexes it again, which is harmless because indexing a book twice leaves
+the index unchanged (§8.1) and metadata is replaced (§8.2).
+
+Batching only changes when the index is written, never its content: after the same books, the index is
+the same for any K, and so are search results. A book becomes searchable when its batch is flushed.
+Flushing once per batch instead of once per book is what makes it cheaper: `json` rewrites the whole
+file on every flush and `folders` every term file of the flushed books (see `incremental_update_time`
+and `batch_update_time`, §11). K = 1 indexes book by book.
 
 Candidates come from `TARANTINO_WORKLOAD/<file>`, where `<file>` is the first argument of the control
 service, or `sample_ids.txt` by default.
@@ -311,12 +325,13 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `build_memory`: memory retained while building, i.e. heap in use after a full garbage collection once
   the N books are added and before the flush, minus the same measure before the build.
 - `incremental_update_time`: mean time per book to index the first 10 new books into an index of exactly
-  the N books of the dataset as the control layer does (§9): the index is opened from storage once, as a
-  new process would, and flushed after every book. Only 10 books, because flushing after each one is far
-  slower (`folders` rewrites every term file of every book).
+  the N books of the dataset book by book, as the control layer does with K = 1 (§9): the index is
+  opened from storage once, as a new process would, and flushed after every book. Only 10 books, because
+  flushing after each one is far slower (`folders` rewrites every term file of every book).
 - `batch_update_time`: mean time per book to index the 100 new books into an index of exactly the N
-  books of the dataset with a single flush at the end, opening the index from storage first. Compared
-  with `incremental_update_time`, it shows what indexing in batches would save.
+  books of the dataset with a single flush at the end, opening the index from storage first, as the
+  control layer does with the default K = 100 (§9). Compared with `incremental_update_time`, it shows
+  what batching saves.
 - `index_open_time`: time to open an index of N books from storage with a new reader, holding nothing
   in memory from previous runs, as a new process would, and answer the first query of `queries.txt`.
   The operating system cache and an open MongoDB connection may be reused, so it measures loading the

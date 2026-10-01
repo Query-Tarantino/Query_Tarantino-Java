@@ -17,6 +17,8 @@ import org.ulpgc.tarantino.indexer.ports.sources.DatalakeReader;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -37,15 +39,12 @@ class LocalAdaptersTest {
     }
 
     @Test
-    void indexerReportsTheNumberOfUniqueTerms() {
+    void indexerReportsTheUniqueTermsOfEachBookAndTheOnesMissingFromTheDatalake() {
         BookText text = new BookText(5, "Title: T", "island whale island", Path.of("5.body.txt"));
+        LocalIndexer indexer = new LocalIndexer(index(bookId -> Optional.of(text).filter(found -> bookId == 5)));
 
-        assertEquals(Outcome.success("2 unique terms indexed"), new LocalIndexer(index(bookId -> Optional.of(text))).index(5));
-    }
-
-    @Test
-    void indexerReportsBooksMissingFromTheDatalake() {
-        assertEquals(Outcome.failure("skipped, not found in the datalake"), new LocalIndexer(index(bookId -> Optional.empty())).index(5));
+        assertEquals(Map.of(5, Outcome.success("2 unique terms indexed"), 6, Outcome.failure("skipped, not found in the datalake")),
+                indexer.index(List.of(5, 6)));
     }
 
     private static IngestBookCommand ingest(StoredPaths stored) {

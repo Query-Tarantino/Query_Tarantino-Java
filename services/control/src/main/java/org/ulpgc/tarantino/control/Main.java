@@ -34,7 +34,7 @@ public class Main {
         return new ControlPipeline(new FileControlStateStore(config.control()),
                 new LocalCrawler(CrawlerFactory.ingestCommand(crawlerConfig)),
                 new LocalIndexer(IndexerFactory.indexCommand(IndexerConfig.fromEnvironment())),
-                candidates(candidatesFile));
+                candidates(candidatesFile), config.indexBatch());
     }
 
     private static Path candidatesFile(ControlConfig config, String[] args) {

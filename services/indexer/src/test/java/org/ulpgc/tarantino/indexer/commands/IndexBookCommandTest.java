@@ -45,6 +45,26 @@ class IndexBookCommandTest {
         assertTrue(index.added.isEmpty());
     }
 
+    @Test
+    void indexesABatchWithOneFlushAndReportsEachBook() {
+        Map<Integer, BookText> stored = Map.of(
+                1, new BookText(1, "Title: One", "whale", Path.of("1.body.txt")),
+                3, new BookText(3, "Title: Three", "island whale", Path.of("3.body.txt")));
+
+        List<IndexResult> results = command(bookId -> Optional.ofNullable(stored.get(bookId))).execute(List.of(1, 2, 3));
+
+        assertEquals(List.of(IndexResult.success(1, 1), IndexResult.notFound(2), IndexResult.success(3, 2)), results);
+        assertEquals(List.of(1, 3), savedBooks.stream().map(Book::bookId).toList());
+        assertEquals(1, index.flushes);
+    }
+
+    @Test
+    void doesNotFlushWhenNoBookOfTheBatchIsFound() {
+        command(bookId -> Optional.empty()).execute(List.of(7, 8));
+
+        assertEquals(0, index.flushes);
+    }
+
     private IndexBookCommand command(DatalakeReader datalake) {
         return new IndexBookCommand(datalake, new HeaderParser(), new Tokenizer(Set.of("the")), index, savedBooks::add);
     }
