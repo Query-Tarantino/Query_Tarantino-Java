@@ -37,8 +37,12 @@ public final class IndexFixture {
     }
 
     public void index(InvertedIndexStorage invertedIndex, List<Integer> ids) {
-        ids.stream().map(this::occurrences).forEach(invertedIndex::add);
+        add(invertedIndex, ids);
         invertedIndex.flush();
+    }
+
+    public void add(InvertedIndexStorage invertedIndex, List<Integer> ids) {
+        ids.stream().map(this::occurrences).forEach(invertedIndex::add);
     }
 
     public void save(MetadataStorage metadata, List<Book> books) {

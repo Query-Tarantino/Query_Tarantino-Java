@@ -11,6 +11,10 @@ public record ResultRow(String structure, String metric, int books, double value
         return new ResultRow(structure, metric, books, value, 0, unit);
     }
 
+    public static ResultRow sample(String structure, String metric, int books, double value, String unit) {
+        return new ResultRow(structure, metric, books, value, Double.NaN, unit);
+    }
+
     public static ResultRow parse(String csvLine) {
         String[] fields = csvLine.split(",", -1);
         return new ResultRow(fields[1], fields[2], Integer.parseInt(fields[3]), Double.parseDouble(fields[4]),

@@ -1,10 +1,15 @@
 from comparison.model.result import Result
 
 HIGHER_IS_BETTER = frozenset({"write_throughput", "recovery_ok"})
+SAME_FOR_EVERY_STRUCTURE = frozenset({"term_count"})
 
 
 def is_higher_better(metric: str) -> bool:
     return metric in HIGHER_IS_BETTER
+
+
+def is_same_for_every_structure(metric: str) -> bool:
+    return metric in SAME_FOR_EVERY_STRUCTURE
 
 
 class Ranking:

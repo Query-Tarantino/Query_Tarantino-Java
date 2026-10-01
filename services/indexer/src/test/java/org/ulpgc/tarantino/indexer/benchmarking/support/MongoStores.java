@@ -36,6 +36,12 @@ final class MongoStores {
         }
     }
 
+    static long documentCount(String connectionUri, String collection) {
+        try (MongoClient client = MongoClients.create(connectionUri)) {
+            return database(client, connectionUri).getCollection(collection).countDocuments();
+        }
+    }
+
     static long diskUsage(String connectionUri) {
         try (MongoClient client = MongoClients.create(connectionUri)) {
             client.getDatabase("admin").runCommand(FLUSH_TO_DISK);

@@ -13,12 +13,15 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.Heap;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
 import org.ulpgc.tarantino.indexer.benchmarking.BenchmarkRunner;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 
+import java.lang.ref.Reference;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -59,7 +62,20 @@ public class FullIndexBuildBenchmark {
 
     @TearDown(Level.Trial)
     public void recordFootprint() {
-        FootprintLog.append(BenchmarkRunner.SERVICE, List.of(ResultRow.exact(index, "disk_usage", books, store.diskUsage(), "bytes")));
+        FootprintLog.append(BenchmarkRunner.SERVICE, List.of(
+                ResultRow.exact(index, "disk_usage", books, store.diskUsage(), "bytes"),
+                ResultRow.exact(index, "term_count", books, store.termCount(), "terms")));
         store.clear();
+        FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "build_memory", books, buildMemory(), "bytes"));
+        store.clear();
+    }
+
+    private long buildMemory() {
+        long before = Heap.usedAfterFullCollection();
+        InvertedIndexStorage invertedIndex = store.invertedIndex();
+        fixture.add(invertedIndex, ids);
+        long retained = Heap.usedAfterFullCollection() - before;
+        Reference.reachabilityFence(invertedIndex);
+        return retained;
     }
 }

@@ -1,5 +1,6 @@
 package org.ulpgc.tarantino.indexer.benchmarking.support;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
@@ -7,6 +8,8 @@ import org.ulpgc.tarantino.indexer.IndexerFactory;
 import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
 public final class BenchmarkStore {
@@ -60,8 +63,24 @@ public final class BenchmarkStore {
         }
     }
 
+    public long termCount() {
+        return switch (config.index()) {
+            case "json" -> jsonTermCount(config.datamarts().resolve("inverted_index.json"));
+            case "folders" -> Directories.fileCount(config.datamarts().resolve("inverted_index"));
+            default -> MongoStores.documentCount(config.mongoUri(), "inverted_index");
+        };
+    }
+
     public long diskUsage() {
         return mongo ? MongoStores.diskUsage(config.mongoUri()) : Directories.diskUsage(config.datamarts());
+    }
+
+    private static long jsonTermCount(Path file) {
+        try {
+            return new ObjectMapper().readTree(file.toFile()).size();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static IndexerConfig config(String name, String index, String metadata) {

@@ -16,6 +16,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class RecoveryScenario {
 
@@ -32,12 +36,12 @@ public final class RecoveryScenario {
         this.downloader = downloader;
     }
 
-    public boolean succeedsFor(List<Integer> ids) {
+    public RecoveryOutcome run(List<Integer> ids) {
         int interruptedBook = ids.size() / 2;
         ingest(ids.subList(0, interruptedBook), INTERRUPTED_RUN);
         interruptWhileStoring(ids.get(interruptedBook));
         ingest(ids, RESUMED_RUN);
-        return everyBookStoredOnce(ids);
+        return new RecoveryOutcome(everyBookStoredOnce(ids), leftoverFiles(ids));
     }
 
     private void ingest(List<Integer> ids, Instant runTime) {
@@ -57,6 +61,16 @@ public final class RecoveryScenario {
     private boolean everyBookStoredOnce(List<Integer> ids) {
         DatalakeStorage datalake = datalake(RESUMED_RUN);
         return bodyFileCount() == ids.size() && ids.stream().allMatch(id -> datalake.pathsOf(id).isPresent());
+    }
+
+    private long leftoverFiles(List<Integer> ids) {
+        DatalakeStorage datalake = datalake(RESUMED_RUN);
+        Set<Path> bookFiles = ids.stream()
+                .map(datalake::pathsOf)
+                .flatMap(Optional::stream)
+                .flatMap(paths -> Stream.of(paths.header(), paths.body()))
+                .collect(Collectors.toSet());
+        return Directories.fileCount(root, file -> !bookFiles.contains(file));
     }
 
     private long bodyFileCount() {

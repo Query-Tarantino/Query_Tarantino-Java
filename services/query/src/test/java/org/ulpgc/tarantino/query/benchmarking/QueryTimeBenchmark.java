@@ -12,29 +12,24 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.benchmarking.support.environment.Heap;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
+import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
 import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
 import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
-import org.ulpgc.tarantino.query.QueryConfig;
-import org.ulpgc.tarantino.query.QueryFactory;
-import org.ulpgc.tarantino.query.adapters.stopwords.FileStopwordsLoader;
 import org.ulpgc.tarantino.query.commands.SearchCommand;
 import org.ulpgc.tarantino.query.model.BookMetadata;
 import org.ulpgc.tarantino.query.model.QueryTerms;
 import org.ulpgc.tarantino.query.model.SearchResult;
-import org.ulpgc.tarantino.query.ports.MetadataReader;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -47,17 +42,8 @@ import java.util.concurrent.TimeUnit;
 @Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class QueryTimeBenchmark {
 
-    private static final MetadataReader CONSTANT_METADATA = new MetadataReader() {
-        @Override
-        public Optional<BookMetadata> book(int bookId) {
-            return Optional.of(new BookMetadata(bookId, "title", "author", "English", Path.of("body.txt")));
-        }
-
-        @Override
-        public List<BookMetadata> booksBy(String author) {
-            return List.of();
-        }
-    };
+    // The first opening of each process is discarded: for mongo it also creates the client
+    private static final int INDEX_MEMORY_SAMPLES = 5;
 
     @Param({"json", "folders", "mongo"})
     public String index;
@@ -71,18 +57,35 @@ public class QueryTimeBenchmark {
     private List<String> queries;
 
     @Setup(Level.Trial)
-    public void buildIndex() {
+    public void openIndex() {
         IndexFixture fixture = IndexFixture.fromEnvironment();
         store = PrebuiltIndexes.of(index, books, fixture);
-        stopwords = stopwords();
-        search = new SearchCommand(QueryFactory.invertedIndex(config()), CONSTANT_METADATA, stopwords);
-        queries = queries();
+        stopwords = QueryWorkload.stopwords();
+        queries = QueryWorkload.queries();
+        search = openAndAnswerEveryQuery();
+        for (int sample = 0; sample < INDEX_MEMORY_SAMPLES; sample++) {
+            recordIndexMemory();
+        }
         requireReferenceResults(fixture);
     }
 
     @Benchmark
     public SearchResult queryTime() {
         return search.execute(queries.get(ThreadLocalRandom.current().nextInt(queries.size())));
+    }
+
+    private void recordIndexMemory() {
+        search = null;
+        long before = Heap.usedAfterFullCollection();
+        search = openAndAnswerEveryQuery();
+        long indexMemory = Heap.usedAfterFullCollection() - before;
+        FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "index_memory", books, indexMemory, "bytes"));
+    }
+
+    private SearchCommand openAndAnswerEveryQuery() {
+        SearchCommand opened = QueryWorkload.openSearch(store, index, stopwords);
+        queries.forEach(opened::execute);
+        return opened;
     }
 
     private void requireReferenceResults(IndexFixture fixture) {
@@ -120,23 +123,5 @@ public class QueryTimeBenchmark {
 
     private List<Integer> resultIds(String query) {
         return search.execute(query).books().stream().map(BookMetadata::bookId).toList();
-    }
-
-    private QueryConfig config() {
-        return new QueryConfig(store.datamarts(), index, "sqlite", store.mongoUri(), BenchmarkPaths.workload());
-    }
-
-    private static Set<String> stopwords() {
-        return new FileStopwordsLoader(BenchmarkPaths.workload().resolve("stopwords.txt")).stopwords();
-    }
-
-    private static List<String> queries() {
-        try {
-            return Files.readAllLines(BenchmarkPaths.workload().resolve("queries.txt")).stream()
-                    .filter(line -> !line.isBlank())
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 }

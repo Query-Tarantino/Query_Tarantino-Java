@@ -1,5 +1,5 @@
 from comparison.model.comparison import COMPARISONS, Comparison
-from comparison.model.ranking import is_higher_better
+from comparison.model.ranking import is_higher_better, is_same_for_every_structure
 from comparison.model.result import Result
 from comparison.ports.chart_renderer import ChartRenderer
 from comparison.report.displayed_value import DisplayedValue
@@ -25,7 +25,14 @@ class MarkdownReport:
         return ["# Data structure comparison", "", f"Generated from {origins}.",
                 "Values are the mean ± the half-width of its 99.9% confidence interval. Per language and size, "
                 "the best value and every value whose interval overlaps it are in **bold**: those structures "
-                "are tied.", ""]
+                "are tied.", ""] + self._missing_errors_warning()
+
+    def _missing_errors_warning(self) -> list[str]:
+        if all(result.error is not None for result in self._results):
+            return []
+        return ["> **Warning:** some results have no error margin (a quick run, or a results file without the "
+                "`error` column). Ties cannot be detected for them, so the best value in **bold** may win only by "
+                "noise: trust only large differences.", ""]
 
     def _section(self, comparison: Comparison) -> list[str]:
         title = [f"## {comparison.title}: {', '.join(comparison.structures)}", "", "### Best structure", ""]
@@ -41,6 +48,8 @@ class MarkdownReport:
     @staticmethod
     def _metric_heading(result: Result) -> list[str]:
         direction = "higher is better" if is_higher_better(result.metric) else "lower is better"
+        if is_same_for_every_structure(result.metric):
+            direction = "must be equal for every structure"
         return [f"### `{result.metric}` ({DisplayedValue(result).unit()}, {direction})", ""]
 
     def _chart(self, comparison: Comparison, results: list[Result]) -> list[str]:

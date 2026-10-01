@@ -4,6 +4,7 @@ import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.DatalakeFixture;
+import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.RecoveryOutcome;
 import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.RecoveryScenario;
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkOptions;
@@ -45,14 +46,16 @@ public class BenchmarkRunner {
 
     private static List<ResultRow> recoveryRows() {
         BenchmarkDataset dataset = BenchmarkDataset.fromEnvironment();
-        return DatalakeFixture.LAYOUTS.stream().map(layout -> recoveryRow(layout, dataset)).toList();
+        return DatalakeFixture.LAYOUTS.stream().flatMap(layout -> recoveryRows(layout, dataset).stream()).toList();
     }
 
-    private static ResultRow recoveryRow(String layout, BenchmarkDataset dataset) {
+    private static List<ResultRow> recoveryRows(String layout, BenchmarkDataset dataset) {
         Path root = BenchmarkPaths.scratch("datalake-recovery-" + layout);
         Directories.delete(root);
-        boolean recovered = new RecoveryScenario(layout, root, dataset::rawText).succeedsFor(dataset.ids(RECOVERY_BOOKS));
+        RecoveryOutcome outcome = new RecoveryScenario(layout, root, dataset::rawText).run(dataset.ids(RECOVERY_BOOKS));
         Directories.delete(root);
-        return ResultRow.exact(layout, "recovery_ok", RECOVERY_BOOKS, recovered ? 1 : 0, "0 or 1");
+        return List.of(
+                ResultRow.exact(layout, "recovery_ok", RECOVERY_BOOKS, outcome.recovered() ? 1 : 0, "0 or 1"),
+                ResultRow.exact(layout, "recovery_leftover_files", RECOVERY_BOOKS, outcome.leftoverFiles(), "files"));
     }
 }

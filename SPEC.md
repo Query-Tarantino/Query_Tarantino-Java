@@ -220,15 +220,16 @@ set as the modification time of the body file.
 - Each benchmark runs in **3 separate processes**. Each process runs warm-up iterations, which are
   discarded, and then measured iterations. Every measured iteration is one **sample**:
 
-| Kind of metric                                                     | Warm-up per process | Measured per process | Samples |
-|--------------------------------------------------------------------|---------------------|----------------------|--------:|
-| One whole run: write, full build, incremental update, insertion    | 1 run               | 3 runs               | 9       |
-| One operation: lookup, detection, query, metadata queries          | 3 × 1 second        | 5 × 1 second         | 15      |
+| Kind of metric                                                              | Warm-up per process | Measured per process | Samples |
+|-----------------------------------------------------------------------------|---------------------|----------------------|--------:|
+| One whole run: write, full build, incremental update, insertion, index open | 1 run               | 3 runs               |       9 |
+| One operation: lookup, detection, query, metadata queries                   | 3 × 1 second        | 5 × 1 second         |      15 |
 
   A sample of the first kind is the time of one run. A sample of the second kind is the mean time per
   operation during one second.
 - Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
-  except for the incremental update, where the index is restored to exactly the dataset of size N.
+  except for the incremental update, where the index is restored to exactly the dataset of size N, and
+  index open, which only reads.
 - The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 99.9%
   confidence interval of that mean, t₀.₉₉₉₅,ₙ₋₁ · s / √n over the n samples (what JMH reports as
   `Score Error`). Two structures are **tied** when their intervals overlap: |a − b| ≤ error(a) + error(b).
@@ -292,20 +293,24 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   the N books are added and before the flush, minus the same measure before the build.
 - `incremental_update_time`: time to index the 100 new books into an index of exactly the N books of the
   dataset, opening the index from storage as a new process would.
-- `index_open_time`: time to open an index of N books from storage, as a new process would, and answer
-  the first query of `queries.txt`.
+- `index_open_time`: time to open an index of N books from storage with a new reader, holding nothing
+  in memory from previous runs, as a new process would, and answer the first query of `queries.txt`.
+  The operating system cache and an open MongoDB connection may be reused, so it measures loading the
+  index, not starting a process.
 - `query_time`: time of a random query of `queries.txt` against an open index of N books; metadata is
   not read, so only the index is measured.
 - `index_memory`: memory retained by an index of N books open for querying, i.e. heap in use after a
   full garbage collection with the index open and every query of `queries.txt` answered once, minus the
-  same measure before opening it. For `mongo` only the client side is measured.
+  same measure before opening it. Each process opens the index once without measuring it and then
+  measures 5 openings, so there are 15 samples. For `mongo` only the client side is measured, with the
+  client already connected.
 - `term_count`: distinct terms in the index of N books.
 - `bulk_insertion_time`: time to save the metadata of N books one by one, through a single open backend,
   into an empty backend.
 - `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, of the dataset.
 - For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`.
-- `build_memory`, `index_memory` and `term_count` are measured once per process; `build_memory` and
-  `index_memory` take their error over the 3 processes.
+- `build_memory` is measured once per process, so it has 3 samples (building again is expensive and its
+  variation is small); `term_count` is exact.
 
 ## 12. Known limitations
 
