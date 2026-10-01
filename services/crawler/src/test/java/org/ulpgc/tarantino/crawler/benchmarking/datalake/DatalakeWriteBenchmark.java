@@ -55,7 +55,7 @@ public class DatalakeWriteBenchmark {
 
     @Benchmark
     public void writeThroughput() {
-        DatalakeFixture.store(DatalakeFixture.datalake(layout, root), ids, dataset);
+        DatalakeFixture.storeAsCrawled(layout, root, ids, dataset, DatalakeFixture.CRAWL_START);
     }
 
     @TearDown(Level.Trial)

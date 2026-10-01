@@ -26,6 +26,7 @@ public class SqliteMetadataAdapter implements MetadataStorage {
     private static final String UPSERT = "INSERT OR REPLACE INTO books (book_id, title, author, language, path) VALUES (?, ?, ?, ?, ?)";
 
     private final Path database;
+    private PreparedStatement upsert;
 
     public SqliteMetadataAdapter(Path database) {
         this.database = database;
@@ -33,12 +34,20 @@ public class SqliteMetadataAdapter implements MetadataStorage {
 
     @Override
     public void save(Book book) {
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(UPSERT)) {
+        try {
+            PreparedStatement statement = upsert();
             bind(statement, book);
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Could not save metadata of book " + book.bookId(), e);
         }
+    }
+
+    private PreparedStatement upsert() throws SQLException {
+        if (upsert == null) {
+            upsert = openConnection().prepareStatement(UPSERT);
+        }
+        return upsert;
     }
 
     private static void bind(PreparedStatement statement, Book book) throws SQLException {
@@ -49,8 +58,7 @@ public class SqliteMetadataAdapter implements MetadataStorage {
         statement.setString(5, PortablePaths.of(book.path()));
     }
 
-
-    private Connection connection() throws SQLException {
+    private Connection openConnection() throws SQLException {
         createParentDirectory();
         Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
         createTable(connection);

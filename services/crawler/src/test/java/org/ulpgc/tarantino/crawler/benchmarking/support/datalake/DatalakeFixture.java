@@ -11,12 +11,15 @@ import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.time.Clock;
 import java.util.List;
 
 public final class DatalakeFixture {
 
     public static final List<String> LAYOUTS = List.of("time", "book", "batch");
+    public static final Instant CRAWL_START = Instant.parse("2025-09-25T00:00:00Z");
 
     private DatalakeFixture() {
     }
@@ -30,7 +33,22 @@ public final class DatalakeFixture {
     }
 
     public static List<StoredPaths> store(DatalakeStorage datalake, List<Integer> ids, BenchmarkDataset dataset) {
-        return ids.stream().map(id -> datalake.save(GutenbergText.bookText(id, dataset.rawText(id)))).toList();
+        return ids.stream().map(id -> save(datalake, id, dataset)).toList();
+    }
+
+    public static List<StoredPaths> storeAsCrawled(String layout, Path root, List<Integer> ids, BenchmarkDataset dataset, Instant start) {
+        CrawlClock clock = new CrawlClock(start);
+        DatalakeStorage datalake = datalake(layout, root, clock);
+        List<StoredPaths> stored = new ArrayList<>(ids.size());
+        for (int position = 0; position < ids.size(); position++) {
+            clock.moveTo(position);
+            stored.add(save(datalake, ids.get(position), dataset));
+        }
+        return stored;
+    }
+
+    private static StoredPaths save(DatalakeStorage datalake, int bookId, BenchmarkDataset dataset) {
+        return datalake.save(GutenbergText.bookText(bookId, dataset.rawText(bookId)));
     }
 
     public static List<ResultRow> footprint(String layout, int books, Path root) {

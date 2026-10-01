@@ -52,8 +52,8 @@ public class DatalakeLookupBenchmark {
         ids = dataset.ids(books);
         root = BenchmarkPaths.scratch("datalake-lookup-" + layout + "-" + books);
         Directories.delete(root);
+        DatalakeFixture.storeAsCrawled(layout, root, ids, dataset, DatalakeFixture.CRAWL_START);
         datalake = DatalakeFixture.datalake(layout, root);
-        DatalakeFixture.store(datalake, ids, dataset);
         ids.forEach(this::requireStored);
     }
 

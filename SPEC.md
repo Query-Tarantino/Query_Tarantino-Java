@@ -203,8 +203,9 @@ dataset and are the same for every N, so results at different N differ only by N
 
 **Simulated download time.** The datalake benchmarks save the books of a dataset as a crawl
 downloading 100 books per hour would: the book at position i (0-based) is saved at T₀ + ⌊i / 100⌋ hours,
-so `time` spreads N books over ⌈N / 100⌉ hour directories. For `book` and `batch` that instant is also
-set as the modification time of the body file.
+so `time` spreads N books over ⌈N / 100⌉ hour directories. In new books detection that instant is also
+set as the modification time of each body file, which `book` and `batch` read (§6); the other
+benchmarks leave it unchanged, so writing costs the same for every layout.
 
 **Execution.**
 

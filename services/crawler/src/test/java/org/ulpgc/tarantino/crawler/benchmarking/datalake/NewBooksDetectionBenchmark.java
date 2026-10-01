@@ -13,6 +13,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.CrawlClock;
 import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.DatalakeFixture;
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
@@ -26,10 +27,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -78,9 +77,11 @@ public class NewBooksDetectionBenchmark {
     }
 
     private void storeOldBooks(List<Integer> ids, BenchmarkDataset dataset) {
-        Instant oldRun = lastRun.minus(AGE_OF_OLD_BOOKS);
-        DatalakeStorage oldDatalake = DatalakeFixture.datalake(layout, root, Clock.fixed(oldRun, ZoneOffset.UTC));
-        DatalakeFixture.store(oldDatalake, ids, dataset).forEach(paths -> age(paths, oldRun));
+        Instant crawlStart = lastRun.minus(AGE_OF_OLD_BOOKS).minus(CrawlClock.durationOf(ids.size()));
+        List<StoredPaths> stored = DatalakeFixture.storeAsCrawled(layout, root, ids, dataset, crawlStart);
+        for (int position = 0; position < stored.size(); position++) {
+            age(stored.get(position), CrawlClock.instantOf(crawlStart, position));
+        }
     }
 
     private static void age(StoredPaths paths, Instant time) {

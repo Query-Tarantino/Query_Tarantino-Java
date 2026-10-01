@@ -11,7 +11,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class SqliteMetadataReader implements MetadataReader {
@@ -21,6 +23,8 @@ public class SqliteMetadataReader implements MetadataReader {
             "SELECT book_id, title, author, language, path FROM books WHERE author LIKE ? ORDER BY book_id";
 
     private final Path database;
+    private final Map<String, PreparedStatement> statements = new HashMap<>();
+    private Connection connection;
 
     public SqliteMetadataReader(Path database) {
         this.database = database;
@@ -37,17 +41,35 @@ public class SqliteMetadataReader implements MetadataReader {
     }
 
     private List<BookMetadata> books(String sql, Parameters parameters) {
-        return Files.exists(database) ? queriedBooks(sql, parameters) : List.of();
+        return connection != null || Files.exists(database) ? queriedBooks(sql, parameters) : List.of();
     }
 
     private List<BookMetadata> queriedBooks(String sql, Parameters parameters) {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try {
+            PreparedStatement statement = statement(sql);
             parameters.bindTo(statement);
-            return booksIn(statement.executeQuery());
+            try (ResultSet rows = statement.executeQuery()) {
+                return booksIn(rows);
+            }
         } catch (SQLException e) {
             throw new IllegalStateException("Could not query " + database, e);
         }
+    }
+
+    private PreparedStatement statement(String sql) throws SQLException {
+        PreparedStatement statement = statements.get(sql);
+        if (statement == null) {
+            statement = connection().prepareStatement(sql);
+            statements.put(sql, statement);
+        }
+        return statement;
+    }
+
+    private Connection connection() throws SQLException {
+        if (connection == null) {
+            connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+        }
+        return connection;
     }
 
     private static List<BookMetadata> booksIn(ResultSet rows) throws SQLException {

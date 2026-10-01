@@ -47,6 +47,18 @@ class SqliteMetadataReaderTest {
     }
 
     @Test
+    void keepsItsConnectionAndSeesBooksSavedAfterItsFirstQuery() throws SQLException {
+        SqliteMetadataReader reader = new SqliteMetadataReader(database);
+        assertEquals(Optional.empty(), reader.book(1342));
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO books VALUES (1342, 'Pride and Prejudice', 'Jane Austen', 'English', 'datalake/1342/body.txt')");
+        }
+
+        assertEquals(Optional.of("Pride and Prejudice"), reader.book(1342).map(BookMetadata::title));
+    }
+
+    @Test
     void treatsAMissingDatabaseAsEmpty() {
         assertEquals(Optional.empty(), new SqliteMetadataReader(directory.resolve("missing.db")).book(84));
     }
