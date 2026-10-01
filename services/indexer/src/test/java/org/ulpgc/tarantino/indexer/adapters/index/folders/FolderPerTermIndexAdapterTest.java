@@ -7,7 +7,10 @@ import org.ulpgc.tarantino.indexer.model.terms.TermOccurrences;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -26,6 +29,21 @@ class FolderPerTermIndexAdapterTest {
         index.flush();
 
         assertEquals("5\n1342\n", Files.readString(root.resolve("i/island.txt")));
-        assertEquals("1342\n", Files.readString(root.resolve("é/écume.txt")));
+        assertEquals("1342\n", Files.readString(root.resolve("%C3%A9/%C3%A9cume.txt")));
+    }
+
+    @Test
+    void keepsTermsApartThatCaseOrNormalizationInsensitiveFileSystemsWouldMerge() throws IOException {
+        List<String> terms = List.of("shape", "ſhape", "heißt", "heisst", "λόγος", "λόγοσ",
+                Normalizer.normalize("café", Normalizer.Form.NFC), Normalizer.normalize("café", Normalizer.Form.NFD));
+        FolderPerTermIndexAdapter index = new FolderPerTermIndexAdapter(root);
+        for (int bookId = 1; bookId <= terms.size(); bookId++) {
+            index.add(new TermOccurrences(bookId, Map.of(terms.get(bookId - 1), 1)));
+        }
+        index.flush();
+
+        try (Stream<Path> files = Files.walk(root)) {
+            assertEquals(terms.size(), files.filter(Files::isRegularFile).count());
+        }
     }
 }

@@ -131,12 +131,19 @@ the structure has an order.
 | Structure | Location                                         | Format |
 |-----------|--------------------------------------------------|--------|
 | `json`    | `<datamarts>/inverted_index.json`                | One JSON object: term → array of ids, e.g. `{"island": [5, 1342]}` |
-| `folders` | `<datamarts>/inverted_index/<c>/<term>.txt`      | One id per line; `<c>` is the first code point of the term (`é/écume.txt`) |
+| `folders` | `<datamarts>/inverted_index/<c>/<name>.txt`      | One id per line; `<name>` encodes the term and `<c>` its first code point (below) |
 | `mongo`   | database `tarantino`*, collection `inverted_index` | One document per term: `{"term": "island", "postings": [5, 1342]}`, unique index on `term` |
 
 - `json` is rewritten completely, and atomically (`.tmp` + rename), each time the index is flushed.
 - `folders` rewrites, on each flush, every affected term file with the union of its stored ids and the
   new ones, sorted and atomically (`.tmp` + rename). Term files that gain no new id are not touched.
+- `folders` file names: in the UTF-8 bytes of the term, ASCII `a`–`z` are kept and every other byte is
+  written as `%` and two uppercase hexadecimal digits (`island` → `island`, `écume` → `%C3%A9cume`). If
+  the result is longer than 200 characters, the name is `#` followed by the lowercase hexadecimal SHA-256
+  of the term's UTF-8 bytes. `<c>` is the first code point of the term encoded the same way
+  (`%C3%A9/%C3%A9cume.txt`). Case-insensitive and normalization-insensitive file systems (APFS, NTFS)
+  would otherwise store distinct terms such as `shape` and `ſhape`, or `café` in NFC and NFD, in the same
+  file, and names would exceed the 255-byte limit for long terms.
 - `mongo` upserts one document per affected term, adding the ids with `$addToSet`; readers must treat
   `postings` as a set.
 

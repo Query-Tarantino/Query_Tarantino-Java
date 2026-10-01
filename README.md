@@ -28,7 +28,7 @@ it leaves behind, and number of files, directories and bytes.
 | Structure | Storage                                           | Trade-off                                                   |
 |-----------|---------------------------------------------------|-------------------------------------------------------------|
 | `json`    | one `datamarts/inverted_index.json`               | Simple and fast to query; rewritten whole on every update   |
-| `folders` | one `datamarts/inverted_index/<c>/<term>.txt` per term | Fine-grained updates; very many small files             |
+| `folders` | one `datamarts/inverted_index/<c>/<name>.txt` per term (name encoded, SPEC §8.1) | Fine-grained updates; very many small files |
 | `mongo`   | MongoDB collection, one document per term         | Indexed random access and concurrency; needs a server       |
 
 Compared on full build time, incremental update time, index open time, query time, memory retained while

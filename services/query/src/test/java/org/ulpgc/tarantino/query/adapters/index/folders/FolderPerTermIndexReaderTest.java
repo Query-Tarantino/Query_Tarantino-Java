@@ -25,4 +25,12 @@ class FolderPerTermIndexReaderTest {
         assertEquals(Set.of(5, 1342), index.postings("island"));
         assertEquals(Set.of(), index.postings("whale"));
     }
+
+    @Test
+    void readsNonAsciiTermsFromTheirEncodedFileName() throws IOException {
+        Files.createDirectories(root.resolve("%C3%A9"));
+        Files.writeString(root.resolve("%C3%A9/%C3%A9cume.txt"), "1342\n");
+
+        assertEquals(Set.of(1342), new FolderPerTermIndexReader(root).postings("écume"));
+    }
 }
