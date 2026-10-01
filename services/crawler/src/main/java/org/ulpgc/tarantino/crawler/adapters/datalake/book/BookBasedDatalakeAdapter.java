@@ -33,6 +33,11 @@ public class BookBasedDatalakeAdapter implements DatalakeStorage {
     }
 
     @Override
+    public int removeIncompleteWrites() {
+        return BookFiles.removeIncompleteWrites(root);
+    }
+
+    @Override
     public Set<Integer> idsStoredSince(Instant instant) {
         return BookFiles.children(root).stream()
                 .filter(directory -> BookFiles.modifiedSince(directory.resolve(BODY_FILE), instant))

@@ -29,8 +29,10 @@ public class Main {
     }
 
     private static ControlPipeline pipeline(ControlConfig config, Path candidatesFile) {
+        CrawlerConfig crawlerConfig = CrawlerConfig.fromEnvironment();
+        CrawlerFactory.removeIncompleteWrites(crawlerConfig);
         return new ControlPipeline(new FileControlStateStore(config.control()),
-                new LocalCrawler(CrawlerFactory.ingestCommand(CrawlerConfig.fromEnvironment())),
+                new LocalCrawler(CrawlerFactory.ingestCommand(crawlerConfig)),
                 new LocalIndexer(IndexerFactory.indexCommand(IndexerConfig.fromEnvironment())),
                 candidates(candidatesFile));
     }

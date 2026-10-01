@@ -94,5 +94,10 @@ class IngestBookCommandTest {
         public Set<Integer> idsStoredSince(Instant instant) {
             return books.keySet();
         }
+
+        @Override
+        public int removeIncompleteWrites() {
+            return 0;
+        }
     }
 }

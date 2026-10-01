@@ -40,6 +40,7 @@ public final class RecoveryScenario {
         int interruptedBook = ids.size() / 2;
         ingest(ids.subList(0, interruptedBook), INTERRUPTED_RUN);
         interruptWhileStoring(ids.get(interruptedBook));
+        datalake(RESUMED_RUN).removeIncompleteWrites();
         ingest(ids, RESUMED_RUN);
         return new RecoveryOutcome(everyBookStoredOnce(ids), leftoverFiles(ids));
     }

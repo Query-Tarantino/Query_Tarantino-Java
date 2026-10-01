@@ -26,6 +26,14 @@ public final class CrawlerFactory {
         return new IngestBookCommand(new GutenbergHttpDownloader(), datalake(config));
     }
 
+    /** Run once before ingesting, so an interrupted previous run leaves nothing behind (SPEC §6). */
+    public static void removeIncompleteWrites(CrawlerConfig config) {
+        int removed = datalake(config).removeIncompleteWrites();
+        if (removed > 0) {
+            System.out.println("Removed " + removed + " files left by an interrupted run from " + config.datalake());
+        }
+    }
+
     public static DatalakeStorage datalake(CrawlerConfig config) {
         return option(DATALAKE_LAYOUTS, config.datalakeLayout(), "datalake layout").apply(config.datalake());
     }

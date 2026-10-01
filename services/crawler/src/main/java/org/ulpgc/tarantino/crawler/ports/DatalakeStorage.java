@@ -14,4 +14,7 @@ public interface DatalakeStorage {
     Optional<StoredPaths> pathsOf(int bookId);
 
     Set<Integer> idsStoredSince(Instant instant);
+
+    /** Removes what an interrupted run left behind (§6) and returns how many files were removed. */
+    int removeIncompleteWrites();
 }

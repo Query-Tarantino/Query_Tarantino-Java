@@ -94,6 +94,11 @@ Writing and lookup:
 3. Saving a book that is already stored does not create a second copy (see §9, ingestion).
 4. Lookup by id: `book` and `batch` compute the path directly; `time` searches the body file name
    under `<root>` up to depth 3.
+5. Before ingesting anything, the crawler and the control layer remove what an interrupted run left
+   behind: every `.tmp` file, every header whose body does not exist next to it, and every directory
+   under `<root>` left empty. Without it `time` would keep, in the old hour directory, the header and
+   the `.tmp` body of a book that the resumed run stores again in a new one. It runs once at start,
+   with no other process writing the datalake.
 
 New books detection lists the ids of the books stored since an instant:
 
@@ -288,8 +293,8 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `new_books_detection_time`: time to list the 100 new books (§6, new books detection). The N books of
   the dataset are saved first, ending one day before the new ones, which are then saved at the current time.
 - `recovery_ok`: measured with 100 books. Half of them are ingested; the next one is interrupted after
-  its header is written, leaving its body as `.tmp`; ingestion of all 100 is then run again one hour
-  later. It is 1 if every book ends with exactly one body file, 0 otherwise.
+  its header is written, leaving its body as `.tmp`; one hour later a new run removes incomplete writes
+  (§6) and ingests all 100 again. It is 1 if every book ends with exactly one body file, 0 otherwise.
 - `recovery_leftover_files`: after the same scenario, the number of files in the datalake that are
   neither the header nor the body of a stored book (`.tmp` files and orphaned headers).
 - `file_count`, `directory_count`, `disk_usage`: the datalake after writing N books; directories do not

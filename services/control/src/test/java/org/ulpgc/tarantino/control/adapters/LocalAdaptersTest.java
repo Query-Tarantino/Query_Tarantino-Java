@@ -64,6 +64,11 @@ class LocalAdaptersTest {
             public Set<Integer> idsStoredSince(Instant instant) {
                 return Set.of();
             }
+
+            @Override
+            public int removeIncompleteWrites() {
+                return 0;
+            }
         };
         return new IngestBookCommand(bookId -> {
             throw new DownloadException(FailureReason.NOT_FOUND, "missing");

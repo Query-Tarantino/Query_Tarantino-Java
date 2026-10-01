@@ -49,6 +49,11 @@ public class TimeBasedDatalakeAdapter implements DatalakeStorage {
     }
 
     @Override
+    public int removeIncompleteWrites() {
+        return BookFiles.removeIncompleteWrites(root);
+    }
+
+    @Override
     public Set<Integer> idsStoredSince(Instant instant) {
         String firstHour = hourKey(LocalDateTime.ofInstant(instant, clock.getZone()));
         return hourDirectories()

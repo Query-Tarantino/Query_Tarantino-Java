@@ -2,7 +2,6 @@ package org.ulpgc.tarantino.crawler.benchmarking.support.datalake;
 
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.ulpgc.tarantino.crawler.ports.BookDownloader;
 
@@ -30,11 +29,10 @@ class DatalakeRecoveryTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"time, 2", "book, 0", "batch, 0"})
-    void countsTheFilesLeftByTheInterruption(String layout, long leftoverFiles) {
+    @ValueSource(strings = {"time", "book", "batch"})
+    void leavesNoFilesBehindBecauseTheResumedRunRemovesIncompleteWrites(String layout) {
         List<Integer> ids = IntStream.rangeClosed(1, 20).boxed().toList();
 
-        // time resumes in a new hour directory, leaving the orphaned header and the .tmp body in the old one
-        assertEquals(leftoverFiles, new RecoveryScenario(layout, root, SYNTHETIC_BOOKS).run(ids).leftoverFiles());
+        assertEquals(0, new RecoveryScenario(layout, root, SYNTHETIC_BOOKS).run(ids).leftoverFiles());
     }
 }
