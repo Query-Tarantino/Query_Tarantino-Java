@@ -46,6 +46,7 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
 | `sample_ids.txt` | Small sample dataset; default candidates of the control service.     |
 | `stopwords.txt`  | Stopwords; each entry is stripped and lowercased (see §7) on load.   |
 | `queries.txt`    | Search benchmark workload, one `<category>: <query>` per line (§11). |
+| `conformance/`   | Conformance cases every implementation must pass (§13).              |
 
 ## 4. Download
 
@@ -392,3 +393,22 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   that compress data or store very small files inside their metadata take less than it reports.
 - The datalake is not synced to disk after each write, so `write_throughput` measures writes to the
   operating system cache.
+
+## 13. Conformance cases
+
+`TARANTINO_WORKLOAD/conformance/` holds language-neutral cases of the rules above, as JSON files with a
+`spec` description, an optional `stopwords` list and a `cases` array. Every implementation runs them in its
+tests, so it can show it is conformant without comparing datalakes or datamarts by hand.
+
+| File                  | Rule | Each case                                                                  |
+|-----------------------|------|----------------------------------------------------------------------------|
+| `split.json`          | §5   | `raw` text and the expected `header` and `body`, or the expected `failure` |
+| `datalake_paths.json` | §6   | `layout`, `id` and `saved_at` instant, and the `header` and `body` paths relative to the root |
+| `header_fields.json`  | §7   | `header` and the expected `title`, `author` and `language` (`null` if missing) |
+| `terms.json`          | §7   | `text` and its expected term frequencies, with the file's `stopwords`      |
+| `folders_names.json`  | §8.1 | `term` and the path of its `folders` file relative to the index root       |
+| `query_terms.json`    | §10  | `query` and its expected terms in order, with the file's `stopwords`       |
+| `search.json`         | §10  | `query` and the expected ids over the file's `books` and `stopwords`       |
+
+The expected values follow this document, not any implementation. When a rule changes, its cases change
+with it, and an implementation that fails a case is not conformant.

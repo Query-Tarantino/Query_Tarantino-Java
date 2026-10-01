@@ -65,6 +65,7 @@ workload/     experiment definition shared by every language implementation
   sample_ids.txt   small sample dataset to test the pipeline quickly
   stopwords.txt    stopwords removed by the tokenizer
   queries.txt      search benchmark workload: 5 queries per category (frequent, rare, mixed, long, empty, non-ASCII)
+  conformance/     cases of the SPEC rules, in JSON, that every implementation must pass (SPEC §13)
 ```
 
 Each service follows the same layout:
@@ -206,6 +207,10 @@ mvn -q -pl services/control exec:java
 mvn test                                              # Java services
 python3 -m unittest discover -s scripts -t scripts    # comparison report
 ```
+
+`mvn test` also runs the conformance cases of `workload/conformance/` (SPEC §13): the header and body split,
+datalake paths, header fields, tokenizer, `folders` file names, query terms and search, each case reported
+by name. The other language implementations must pass the same files.
 
 MongoDB adapters are tested with [Testcontainers](https://testcontainers.com/), which starts a disposable
 `mongo:7.0` container for the test run; no MongoDB needs to be running. Without Docker those tests are

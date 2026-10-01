@@ -33,17 +33,21 @@ public final class FootprintLog {
     }
 
     public static List<ResultRow> drain(String service) {
+        return drain(file(service), samplesFile(service));
+    }
+
+    static List<ResultRow> drain(Path exactFile, Path samplesFile) {
         try {
-            List<ResultRow> rows = Stream.concat(exactRows(file(service)), meanRows(samplesFile(service))).toList();
-            Files.deleteIfExists(file(service));
-            Files.deleteIfExists(samplesFile(service));
+            List<ResultRow> rows = Stream.concat(exactRows(exactFile), meanRows(samplesFile)).toList();
+            Files.deleteIfExists(exactFile);
+            Files.deleteIfExists(samplesFile);
             return rows;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private static void append(Path file, List<ResultRow> rows) {
+    static void append(Path file, List<ResultRow> rows) {
         try {
             Files.createDirectories(file.getParent());
             Files.write(file, rows.stream().map(ResultRow::csvLine).toList(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
