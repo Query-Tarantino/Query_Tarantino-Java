@@ -36,6 +36,6 @@ class CrawlClockTest {
         }
 
         // 20250925/23, 20250926/00 and 20250926/01, plus their two day directories
-        assertEquals(5, Directories.directoryCount(root));
+        assertEquals(5, Directories.footprint(root).directories());
     }
 }

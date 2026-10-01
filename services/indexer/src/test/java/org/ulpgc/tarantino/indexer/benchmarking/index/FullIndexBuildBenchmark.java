@@ -21,6 +21,7 @@ import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
 import org.ulpgc.tarantino.indexer.benchmarking.BenchmarkRunner;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
+import org.ulpgc.tarantino.indexer.benchmarking.support.StoreFootprint;
 import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 
 import java.lang.ref.Reference;
@@ -77,9 +78,11 @@ public class FullIndexBuildBenchmark {
 
     @TearDown(Level.Trial)
     public void recordFootprint() {
+        StoreFootprint footprint = store.footprint();
         FootprintLog.append(BenchmarkRunner.SERVICE, List.of(
-                ResultRow.exact(index, "disk_usage", books, store.diskUsage(), "bytes"),
-                ResultRow.exact(index, "term_count", books, store.termCount(), "terms")));
+                ResultRow.exact(index, "disk_usage", books, footprint.bytes(), "bytes"),
+                ResultRow.exact(index, "disk_allocated", books, footprint.allocatedBytes(), "bytes"),
+                ResultRow.exact(index, "term_count", books, footprint.terms(), "terms")));
         store.clear();
         FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "build_memory", books, buildMemory(), "bytes"));
         store.clear();

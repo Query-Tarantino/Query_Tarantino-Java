@@ -291,6 +291,7 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 |          |                              | `file_count`               | files   |
 |          |                              | `directory_count`          | dirs    |
 |          |                              | `disk_usage`               | bytes   |
+|          |                              | `disk_allocated`           | bytes   |
 | Index    | `json`, `folders`, `mongo`   | `full_build_time`          | ms      |
 |          |                              | `incremental_update_time`  | ms/book |
 |          |                              | `batch_update_time`        | ms/book |
@@ -301,6 +302,7 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 |          |                              | `memory_allocated`         | bytes   |
 |          |                              | `term_count`               | terms   |
 |          |                              | `disk_usage`               | bytes   |
+|          |                              | `disk_allocated`           | bytes   |
 | Metadata | `sqlite`, `mongo`            | `bulk_insertion_time`      | ms      |
 |          |                              | `book_by_id_time`          | µs/op   |
 |          |                              | `books_by_author_time`     | µs/op   |
@@ -316,8 +318,15 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   (§6) and ingests all 100 again. It is 1 if every book ends with exactly one body file, 0 otherwise.
 - `recovery_leftover_files`: after the same scenario, the number of files in the datalake that are
   neither the header nor the body of a stored book (`.tmp` files and orphaned headers).
-- `file_count`, `directory_count`, `disk_usage`: the datalake after writing N books; directories do not
-  count the root, and `disk_usage` is the sum of file sizes in bytes.
+- `file_count`, `directory_count`, `disk_usage`, `disk_allocated`: the datalake after writing N books;
+  directories do not count the root, and `disk_usage` is the sum of file sizes in bytes.
+- `disk_allocated`, for the datalake and the file-based indexes: the same files, each size rounded up to
+  whole blocks of the file system that holds them (an empty file takes none). The block size is the one
+  the file system reports: Java `FileStore.getBlockSize()`, Python `os.statvfs(path).f_frsize` (not
+  `f_bsize`, the preferred I/O size), 4096 bytes on default APFS, ext4 and NTFS. It is close to what the
+  files really take: the `folders` index of 2000 books has 587 545 term files and about 55 MB of
+  `disk_usage`, but at one 4096-byte block per file at least it takes about 2.4 GB. All the footprint
+  metrics of a tree are measured in one walk.
 - `full_build_time` and `memory_allocated`: time and bytes allocated to read, split, tokenize and index
   N books into an empty index, flushing once at the end. `memory_allocated` is counted by every thread
   around the build alone, never around emptying the storage, one sample per measured run. It counts
@@ -347,7 +356,8 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `bulk_insertion_time`: time to save the metadata of N books one by one, through a single open backend,
   into an empty backend.
 - `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, of the dataset.
-- For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`.
+- For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`;
+  that is already allocated storage, so `disk_allocated` equals it.
 - `build_memory` is measured once per process, so it has 3 samples (building again is expensive and its
   variation is small); `term_count` is exact.
 
@@ -358,7 +368,7 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - Case mapping may differ between runtimes for a few rare characters; this is accepted.
 - Java `strip` does not remove U+00A0, U+2007 and U+202F, while Python and C# do. Header and body
   files may differ by those characters at their edges; terms are not affected.
-- `disk_usage` of files is their logical size, not the blocks allocated by the file system, so
-  structures with many small files (`folders`, `book`) take more disk space than reported.
+- `disk_allocated` is an estimate: it leaves out directories and file system metadata, and file systems
+  that compress data or store very small files inside their metadata take less than it reports.
 - The datalake is not synced to disk after each write, so `write_throughput` measures writes to the
   operating system cache.

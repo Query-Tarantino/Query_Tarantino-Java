@@ -3,6 +3,7 @@ package org.ulpgc.tarantino.indexer.benchmarking.support;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.Footprint;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
 import org.ulpgc.tarantino.indexer.IndexerFactory;
 import org.ulpgc.tarantino.indexer.adapters.index.folders.TermFileRestore;
@@ -78,16 +79,22 @@ public final class BenchmarkStore {
         }
     }
 
-    public long termCount() {
-        return switch (config.index()) {
-            case "json" -> jsonTermCount(config.datamarts().resolve("inverted_index.json"));
-            case FOLDERS -> Directories.fileCount(folderIndex());
-            default -> MongoStores.documentCount(config.mongoUri(), "inverted_index");
-        };
-    }
-
-    public long diskUsage() {
-        return mongo ? MongoStores.diskUsage(config.mongoUri()) : Directories.diskUsage(config.datamarts());
+    /**
+     * Measures the index once it is flushed. MongoDB reports allocated storage, so its two sizes are equal; a
+     * folders index is walked once for its files, sizes and blocks.
+     */
+    public StoreFootprint footprint() {
+        if (mongo) {
+            long bytes = MongoStores.diskUsage(config.mongoUri());
+            return new StoreFootprint(bytes, bytes, MongoStores.documentCount(config.mongoUri(), "inverted_index"));
+        }
+        if (FOLDERS.equals(config.index())) {
+            Footprint folders = Directories.footprint(folderIndex());
+            return new StoreFootprint(folders.bytes(), folders.allocatedBytes(), folders.files());
+        }
+        Footprint json = Directories.footprint(config.datamarts());
+        long terms = jsonTermCount(config.datamarts().resolve("inverted_index.json"));
+        return new StoreFootprint(json.bytes(), json.allocatedBytes(), terms);
     }
 
     private Path folderIndex() {

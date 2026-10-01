@@ -5,6 +5,7 @@ import org.ulpgc.tarantino.crawler.CrawlerFactory;
 import org.ulpgc.tarantino.crawler.adapters.datalake.time.TimeBasedDatalakeAdapter;
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
+import org.ulpgc.tarantino.crawler.benchmarking.support.files.Footprint;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
 import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
@@ -57,9 +58,11 @@ public final class DatalakeFixture {
     }
 
     public static List<ResultRow> footprint(String layout, int books, Path root) {
+        Footprint footprint = Directories.footprint(root);
         return List.of(
-                ResultRow.exact(layout, "file_count", books, Directories.fileCount(root), "files"),
-                ResultRow.exact(layout, "directory_count", books, Directories.directoryCount(root), "dirs"),
-                ResultRow.exact(layout, "disk_usage", books, Directories.diskUsage(root), "bytes"));
+                ResultRow.exact(layout, "file_count", books, footprint.files(), "files"),
+                ResultRow.exact(layout, "directory_count", books, footprint.directories(), "dirs"),
+                ResultRow.exact(layout, "disk_usage", books, footprint.bytes(), "bytes"),
+                ResultRow.exact(layout, "disk_allocated", books, footprint.allocatedBytes(), "bytes"));
     }
 }

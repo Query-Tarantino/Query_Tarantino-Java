@@ -21,7 +21,7 @@ them against each other with the same books, the same rules and in three languag
 | `batch`   | `datalake/<id div 1000>/<id>.header.txt`, `.body.txt` | Direct lookup by id; few directories with many files        |
 
 Compared on write throughput, lookup time, new books detection, recovery after an interruption and the files
-it leaves behind, and number of files, directories and bytes.
+it leaves behind, and number of files, directories and bytes (logical and in whole disk blocks).
 
 **2. Inverted index: how terms map to books** (PDF §4.2)
 
@@ -33,7 +33,7 @@ it leaves behind, and number of files, directories and bytes.
 
 Compared on full build time, incremental update time (book by book, as the control layer indexes, and in
 batch), index open time, query time, memory retained while building and while open, allocated memory, number
-of terms and disk usage.
+of terms and disk usage (logical and in whole disk blocks).
 
 **3. Metadata: where title, author, language and path are stored** (PDF §4.1)
 

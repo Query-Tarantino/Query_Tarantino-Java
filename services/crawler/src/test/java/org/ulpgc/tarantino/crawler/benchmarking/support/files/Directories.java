@@ -2,8 +2,11 @@ package org.ulpgc.tarantino.crawler.benchmarking.support.files;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
@@ -30,12 +33,19 @@ public final class Directories {
         return entries(root).stream().filter(Files::isRegularFile).filter(filter).count();
     }
 
-    public static long directoryCount(Path root) {
-        return entries(root).stream().filter(Files::isDirectory).filter(Predicate.not(root::equals)).count();
-    }
-
-    public static long diskUsage(Path root) {
-        return entries(root).stream().filter(Files::isRegularFile).mapToLong(Directories::size).sum();
+    /** Measures the tree in one walk, reading sizes from the attributes the walk already has. */
+    public static Footprint footprint(Path root) {
+        if (!Files.exists(root)) {
+            return Footprint.NONE;
+        }
+        try {
+            long blockSize = Files.getFileStore(root).getBlockSize();
+            FootprintVisitor visitor = new FootprintVisitor(root, blockSize);
+            Files.walkFileTree(root, visitor);
+            return visitor.footprint();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static List<Path> entries(Path root) {
@@ -69,11 +79,40 @@ public final class Directories {
         }
     }
 
-    private static long size(Path file) {
-        try {
-            return Files.size(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    private static final class FootprintVisitor extends SimpleFileVisitor<Path> {
+
+        private final Path root;
+        private final long blockSize;
+        private long files;
+        private long directories;
+        private long bytes;
+        private long allocatedBytes;
+
+        private FootprintVisitor(Path root, long blockSize) {
+            this.root = root;
+            this.blockSize = blockSize;
+        }
+
+        @Override
+        public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+            if (!directory.equals(root)) {
+                directories++;
+            }
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+            if (attributes.isRegularFile()) {
+                files++;
+                bytes += attributes.size();
+                allocatedBytes += (attributes.size() + blockSize - 1) / blockSize * blockSize;
+            }
+            return FileVisitResult.CONTINUE;
+        }
+
+        private Footprint footprint() {
+            return new Footprint(files, directories, bytes, allocatedBytes);
         }
     }
 }
