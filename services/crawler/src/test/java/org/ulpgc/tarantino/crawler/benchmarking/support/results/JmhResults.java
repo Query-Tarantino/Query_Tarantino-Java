@@ -15,7 +15,6 @@ import java.util.function.ToDoubleFunction;
 public final class JmhResults {
 
     private static final List<String> STRUCTURE_PARAMS = List.of("layout", "index", "metadata");
-    private static final double CONFIDENCE = 0.999;
 
     private JmhResults() {
     }
@@ -34,7 +33,7 @@ public final class JmhResults {
         result.getBenchmarkResults().forEach(process -> process.getIterationResults()
                 .forEach(iteration -> samples.addValue(value.applyAsDouble(iteration.getPrimaryResult()))));
         BenchmarkParams params = result.getParams();
-        return new ResultRow(structure(params), metric, books(params), samples.getMean(), samples.getMeanErrorAt(CONFIDENCE), unit);
+        return new ResultRow(structure(params), metric, books(params), samples.getMean(), samples.getMeanErrorAt(ResultRow.CONFIDENCE), unit);
     }
 
     public static String method(RunResult result) {
@@ -47,7 +46,9 @@ public final class JmhResults {
     }
 
     private static ResultRow row(BenchmarkParams params, Metric metric, Result<?> result) {
-        return metric.row(structure(params), books(params), result.getScore(), result.getScoreError());
+        // Not result.getScoreError(): JMH computes it at a fixed 99.9%
+        double error = result.getStatistics().getMeanErrorAt(ResultRow.CONFIDENCE);
+        return metric.row(structure(params), books(params), result.getScore(), error);
     }
 
     private static int books(BenchmarkParams params) {

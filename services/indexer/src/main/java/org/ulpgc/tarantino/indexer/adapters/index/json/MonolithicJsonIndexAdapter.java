@@ -27,6 +27,11 @@ public class MonolithicJsonIndexAdapter implements InvertedIndexStorage {
     }
 
     @Override
+    public void open() {
+        index();
+    }
+
+    @Override
     public void add(TermOccurrences occurrences) {
         occurrences.frequencies().keySet().forEach(term -> postings(term).add(occurrences.bookId()));
     }

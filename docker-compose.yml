@@ -1,4 +1,5 @@
-# Development only: the benchmarks require a native MongoDB 7.0 (SPEC §11, README).
+# For development. Benchmarks need MongoDB outside any virtual machine with a 1 GB cache (SPEC §11):
+# on Linux, the README's docker run with host networking; on macOS, a native install.
 services:
   mongo:
     image: mongo:7.0

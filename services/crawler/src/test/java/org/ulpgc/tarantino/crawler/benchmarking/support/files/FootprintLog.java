@@ -17,8 +17,6 @@ import java.util.stream.Stream;
 
 public final class FootprintLog {
 
-    private static final double CONFIDENCE = 0.999;
-
     private FootprintLog() {
     }
 
@@ -72,7 +70,7 @@ public final class FootprintLog {
         ListStatistics statistics = new ListStatistics();
         samples.forEach(sample -> statistics.addValue(sample.value()));
         ResultRow first = samples.getFirst();
-        return new ResultRow(first.structure(), first.metric(), first.books(), statistics.getMean(), statistics.getMeanErrorAt(CONFIDENCE), first.unit());
+        return new ResultRow(first.structure(), first.metric(), first.books(), statistics.getMean(), statistics.getMeanErrorAt(ResultRow.CONFIDENCE), first.unit());
     }
 
     private static List<ResultRow> rows(Path file) throws IOException {

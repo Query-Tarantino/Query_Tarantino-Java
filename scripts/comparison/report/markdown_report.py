@@ -23,7 +23,7 @@ class MarkdownReport:
     def _heading(self) -> list[str]:
         origins = ", ".join(f"`{origin}`" for origin in self._origins)
         return ["# Data structure comparison", "", f"Generated from {origins}.",
-                "Values are the mean ± the half-width of its 99.9% confidence interval. Per language and size, "
+                "Values are the mean ± the half-width of its 95% confidence interval. Per language and size, "
                 "the best value and every value whose interval overlaps it are in **bold**: those structures "
                 "are tied.", ""] + self._missing_errors_warning()
 

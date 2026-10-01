@@ -39,4 +39,18 @@ class MonolithicJsonIndexAdapterTest {
 
         assertEquals("{\"island\":[5,1342]}", Files.readString(file));
     }
+
+    @Test
+    void opensTheStoredIndexIntoMemoryBeforeAddingBooks() throws IOException {
+        Path file = directory.resolve("inverted_index.json");
+        Files.writeString(file, "{\"island\":[5]}");
+        MonolithicJsonIndexAdapter index = new MonolithicJsonIndexAdapter(file);
+
+        index.open();
+        Files.delete(file);
+        index.add(new TermOccurrences(1342, Map.of("whale", 1)));
+        index.flush();
+
+        assertEquals("{\"island\":[5],\"whale\":[1342]}", Files.readString(file));
+    }
 }

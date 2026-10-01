@@ -6,6 +6,8 @@ public record ResultRow(String structure, String metric, int books, double value
 
     public static final String LANGUAGE = "java";
     public static final String CSV_HEADER = "language,structure,metric,n_books,value,error,unit";
+    /** {@code error} is the half-width of this confidence interval of the mean of the samples (SPEC §11). */
+    public static final double CONFIDENCE = 0.95;
 
     public static ResultRow exact(String structure, String metric, int books, double value, String unit) {
         return new ResultRow(structure, metric, books, value, 0, unit);

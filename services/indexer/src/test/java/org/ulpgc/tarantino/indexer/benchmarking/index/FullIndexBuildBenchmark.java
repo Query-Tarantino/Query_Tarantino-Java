@@ -39,10 +39,12 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 0)
 @Measurement(iterations = 3)
-@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 2, jvmArgsAppend = {"-Xms4g", "-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class FullIndexBuildBenchmark {
 
     private static final int WARM_UP_BOOKS = 100;
+    // Adding without flushing is cheap next to a build, and 2 processes give 6 samples instead of 2
+    private static final int BUILD_MEMORY_SAMPLES = 3;
 
     @Param({"json", "folders", "mongo"})
     public String index;
@@ -66,8 +68,12 @@ public class FullIndexBuildBenchmark {
         warmUp();
     }
 
-    /** Warms the JIT up with the same code on 100 books instead of a whole warm-up build of N (SPEC §11). */
+    /**
+     * Warms the JIT up with the same code on 100 books instead of a whole warm-up build of N (SPEC §11), and reads
+     * the N texts once so that the first measured build finds them in the operating system cache, like the others.
+     */
     private void warmUp() {
+        ids.forEach(fixture.dataset()::rawText);
         BenchmarkStore warmUp = BenchmarkStore.forIndex(index, "index-build-warmup-" + index);
         warmUp.clear();
         fixture.index(warmUp.invertedIndex(), fixture.dataset().ids(WARM_UP_BOOKS));
@@ -104,8 +110,10 @@ public class FullIndexBuildBenchmark {
                 ResultRow.exact(index, "disk_usage", books, footprint.bytes(), "bytes"),
                 ResultRow.exact(index, "disk_allocated", books, footprint.allocatedBytes(), "bytes"),
                 ResultRow.exact(index, "term_count", books, footprint.terms(), "terms")));
-        store.clear();
-        FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "build_memory", books, buildMemory(), "bytes"));
+        for (int sample = 0; sample < BUILD_MEMORY_SAMPLES; sample++) {
+            store.clear();
+            FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "build_memory", books, buildMemory(), "bytes"));
+        }
         store.clear();
     }
 

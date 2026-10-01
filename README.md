@@ -103,20 +103,34 @@ The following directories are **created at runtime** in the project root and are
 
 - Java 25
 - Maven 3.9+
-- MongoDB 7.0, only for the `mongo` index or metadata backends: installed natively for the benchmarks,
-  or in Docker for development
-- Docker, only for the tests of the MongoDB adapters
+- A Unix system: Linux is the reference platform; macOS works the same
+- MongoDB 7.0, only for the `mongo` index or metadata backends
+- Docker, only for the tests of the MongoDB adapters (and optionally to run MongoDB on Linux)
 - Python 3.10+ for the comparison report (matplotlib is optional and only adds charts)
 
-MongoDB 7.0 is the version shared by every implementation. **The benchmarks require it installed natively**
-(SPEC §11); on macOS:
+MongoDB 7.0 is the version shared by every implementation. For the benchmarks it must run on the machine
+itself, not inside a virtual machine, with its cache fixed at 1 GB (SPEC §11); by default MongoDB takes up to
+half of the RAM minus 1 GB.
+
+**Linux.** Either install the official MongoDB 7.0 Community packages for your distribution
+(https://www.mongodb.com/docs/v7.0/administration/install-on-linux/), set the cache in `/etc/mongod.conf`
+and start it with `sudo systemctl start mongod`, or run the official image with host networking, which on
+Linux is as fast as a native install because containers share the host kernel:
+
+```bash
+docker run -d --name tarantino-mongo --network host mongo:7.0 --wiredTigerCacheSizeGB 1
+```
+
+**macOS.** Docker runs containers inside a virtual machine there, which reserves its own memory (2 GB by
+default with Colima) and adds a network round trip to every operation, so install MongoDB natively:
 
 ```bash
 brew tap mongodb/brew && brew install mongodb-community@7.0
+brew services start mongodb-community@7.0   # stop with: brew services stop mongodb-community@7.0
 ```
 
-Fix its cache at 1 GB, as the SPEC requires, by adding this to `/opt/homebrew/etc/mongod.conf` (by default
-MongoDB takes up to half of the RAM minus 1 GB, about 11.5 GB on a 24 GB machine):
+The cache setting, in `/etc/mongod.conf` on Linux or `/opt/homebrew/etc/mongod.conf` on macOS, goes inside the
+existing `storage:` section:
 
 ```yaml
 storage:
@@ -125,18 +139,8 @@ storage:
       cacheSizeGB: 1
 ```
 
-```bash
-brew services start mongodb-community@7.0   # start it on localhost:27017
-brew services stop mongodb-community@7.0    # stop it
-```
-
-On Linux and Windows, install MongoDB 7.0 Community from https://www.mongodb.com/try/download/community
-and set the same `cacheSizeGB` in its `mongod.conf`.
-
-For development only, `docker compose up -d` starts the same version in a container (`docker compose down`
-stops it, `-v` also deletes the data). It is not valid for benchmarking: on macOS and Windows Docker runs a
-virtual machine, which uses more memory (the VM reserves its own, 2 GB by default with Colima, on top of
-MongoDB) and adds a network round trip to every operation, so `mongo` would come out slower than it is.
+For development on any system, `docker compose up -d` starts the same version (`docker compose down` stops
+it, `-v` also deletes the data).
 
 ## Configuration
 
@@ -225,7 +229,8 @@ by name. The other language implementations must pass the same files.
 
 MongoDB adapters are tested with [Testcontainers](https://testcontainers.com/), which starts a disposable
 `mongo:7.0` container for the test run; no MongoDB needs to be running. Without Docker those tests are
-skipped, not failed. With [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop, export first:
+skipped, not failed. On macOS with [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop, export
+first:
 
 ```bash
 export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
@@ -265,21 +270,33 @@ only by the bandwidth.
 
 ### Running
 
-Native MongoDB must be running for the `mongo` structures (`brew services start mongodb-community@7.0`,
-see [Requirements](#requirements)); stop the Docker one first (`docker compose down`), since both use
-port 27017. From the project root:
+MongoDB 7.0 must be running for the `mongo` structures, set up for benchmarking as described in
+[Requirements](#requirements); stop the development container first (`docker compose down`) if it is not the
+one you set up, since both use port 27017. From the project root:
 
 ```bash
-mvn -q install -DskipTests                               # build the services and the benchmark support jars
-mvn verify -Pbenchmark -DskipTests                       # every service
-mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
+mvn -q install -DskipTests                                 # build the services and the benchmark support jars
+mvn verify -Pbenchmark -DskipTests                         # every service
+mvn verify -Pbenchmark -DskipTests -pl services/indexer    # a single service
 ```
 
-A full run with 100, 300 and 1 000 books takes **about 1 hour 15 minutes** (estimated): every benchmark runs
-in 3 processes (SPEC §11), and most of the time goes to building and updating the `folders` index, one file
-per term. The time was kept down without losing samples: builds and updates warm up on a few books, the
-copy of the index that updates work on is made once per run, and one query run measures every category.
-These variables shorten it further:
+Keep the machine as SPEC §11 requires: plugged in, out of any power-saving mode, with nothing else running,
+and awake for the whole run. Wrap the command so the system does not sleep until it ends:
+
+```bash
+systemd-inhibit --what=idle:sleep mvn verify -Pbenchmark -DskipTests   # Linux
+caffeinate -i mvn verify -Pbenchmark -DskipTests                       # macOS
+```
+
+Laptops, above all fanless ones, lower their clock speed under sustained load, so a cool machine on a hard
+surface gives steadier results. The scratch files go under `benchmarks/tmp.noindex/`, which Spotlight skips
+on macOS; on a Linux desktop with KDE Baloo, which indexes the whole home directory, exclude `benchmarks/` in
+its settings.
+
+A full run with 100, 300 and 1 000 books takes **about 1 hour 30 minutes** on an Apple M4 laptop with an SSD
+(estimated from per-run times and the speed of the disk, checked against a quick run; it depends mostly on
+the disk): every benchmark runs in 2 processes (SPEC §11), and most of the time goes to building and updating
+the `folders` index, one file per term. These variables shorten it:
 
 | Variable                         | Effect                                                        |
 |----------------------------------|---------------------------------------------------------------|

@@ -251,24 +251,32 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
 
 **Execution.**
 
-- Same machine for all languages, with nothing else running. The files that benchmarks write are kept
-  out of file indexing: on macOS, under `<benchmarks>/tmp.noindex/`, since Spotlight skips directories
-  whose name ends in `.noindex`.
-- Same MongoDB for all languages: **MongoDB 7.0 running natively** on the benchmark machine, with the
-  WiredTiger cache fixed at 1 GB (`storage.wiredTiger.engineConfig.cacheSizeGB: 1`), using one database
-  per benchmark. It must not run in a container: on macOS and Windows Docker runs a virtual machine that
-  reserves its own memory and adds a network round trip to every operation, so `mongo` would be measured
-  at a disadvantage. `docker-compose.yml` is only for development.
+- Benchmarks target any Unix system: Linux is the reference platform and macOS is compatible. Same
+  machine for all languages, with nothing else running.
+- The files that benchmarks write go under `<benchmarks>/tmp.noindex/` and are kept out of desktop file
+  indexers: macOS Spotlight skips directories whose name ends in `.noindex`; on a Linux desktop whose
+  indexer covers the project (KDE Baloo indexes the whole home directory by default), exclude `<benchmarks>`
+  in its settings. Servers have no indexer.
+- The machine stays awake, on mains power and out of any power-saving mode for the whole run, for example
+  `systemd-inhibit --what=idle:sleep <command>` on Linux or `caffeinate -i <command>` on macOS. A laptop
+  that sleeps stops the run, and one that slows down under sustained load, as fanless laptops do,
+  penalizes whatever is measured later.
+- Same MongoDB for all languages: **MongoDB 7.0 on the benchmark machine itself, not inside a virtual
+  machine**, with the WiredTiger cache fixed at 1 GB (`storage.wiredTiger.engineConfig.cacheSizeGB: 1`, or
+  `--wiredTigerCacheSizeGB 1`), using one database per benchmark. On Linux, a native install or a Docker
+  container with host networking both qualify, since containers share the host kernel. On macOS (and
+  Windows), Docker runs containers inside a virtual machine that reserves its own memory and adds a
+  network round trip to every operation, so MongoDB must be installed natively there.
 - Record CPU, RAM, OS, runtime versions and the MongoDB version.
-- Each benchmark runs in **3 separate processes**. Each process runs warm-up iterations, which are
+- Each benchmark runs in **2 separate processes**. Each process runs warm-up iterations, which are
   discarded, and then measured iterations. Every measured iteration is one **sample**:
 
 | Kind of metric                                            | Warm-up per process                                 | Measured per process | Samples |
 |-----------------------------------------------------------|-----------------------------------------------------|----------------------|--------:|
-| Full build                                                | building 100 books                                  | 3 runs               |       9 |
-| Incremental and batch update                              | updating an empty index with the first 10 new books | 3 runs               |       9 |
-| Other whole runs: write, insertion, index open            | 1 run                                               | 3 runs               |       9 |
-| One operation: lookup, detection, query, metadata queries | 3 × 1 second                                        | 5 × 1 second         |      15 |
+| Full build                                                | building 100 books                                  | 3 runs               |       6 |
+| Incremental and batch update                              | updating an empty index with the first 10 new books | 3 runs               |       6 |
+| Other whole runs: write, insertion, index open            | 1 run                                               | 3 runs               |       6 |
+| One operation: lookup, detection, query, metadata queries | 3 × 1 second                                        | 5 × 1 second         |      10 |
 
   Warming up only compiles the code, so full builds and updates warm up on a small input with the same code
   instead of a whole run of N books, which for `folders` alone would cost minutes per process.
@@ -277,9 +285,15 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
 - Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
   except for the incremental and batch updates, where the index is restored to exactly the dataset of
   size N, and index open, which only reads.
-- The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 99.9%
-  confidence interval of that mean, t₀.₉₉₉₅,ₙ₋₁ · s / √n over the n samples (what JMH reports as
-  `Score Error`). Two structures are **tied** when their intervals overlap: |a − b| ≤ error(a) + error(b).
+- The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 95%
+  confidence interval of that mean, t₀.₉₇₅,ₙ₋₁ · s / √n over the n samples, computed from the samples
+  (JMH's own `Score Error` is fixed at 99.9%). Two structures are **tied** when their intervals overlap:
+  |a − b| ≤ error(a) + error(b).
+- 95% is the usual confidence level in statistics; JMH's 99.9% is far stricter. With it, 2 processes give
+  narrower intervals than 3 processes at 99.9% (t₀.₉₇₅,₅ / √6 = 1.05 against t₀.₉₉₉₅,₈ / √9 = 1.68 for 6
+  and 9 samples) with a third fewer runs. What 2 processes capture less is the variation between
+  processes, and samples of one process are not fully independent, so intervals may be slightly
+  optimistic.
 
 **Validation.** Before measuring, each benchmark checks that the structure gives the correct result,
 and the benchmark run fails without writing results otherwise:
@@ -356,13 +370,15 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `build_memory`: memory retained while building, i.e. heap in use after a full garbage collection once
   the N books are added and before the flush, minus the same measure before the build.
 - `incremental_update_time`: mean time per book to index the first 10 new books into an index of exactly
-  the N books of the dataset book by book, as the control layer does with K = 1 (§9): the index is
-  opened from storage once, as a new process would, and flushed after every book. Only 10 books, because
-  flushing after each one is far slower (`folders` rewrites every term file of every book).
+  the N books of the dataset book by book, as the control layer does with K = 1 (§9): flushed after every
+  book. Only 10 books, because flushing after each one is far slower (`folders` rewrites every term file
+  of every book).
 - `batch_update_time`: mean time per book to index the 100 new books into an index of exactly the N
-  books of the dataset with a single flush at the end, opening the index from storage first, as the
-  control layer does with the default K = 100 (§9). Compared with `incremental_update_time`, it shows
-  what batching saves.
+  books of the dataset with a single flush at the end, as the control layer does with the default
+  K = 100 (§9). Compared with `incremental_update_time`, it shows what batching saves.
+- Both updates open the index before timing, as a running control layer has it open: loading it (all of
+  `json`) is measured by `index_open_time`, and timing it here would spread it over 10 books in one
+  metric and over 100 in the other.
 - `index_open_time`: time to open an index of N books from storage with a new reader, holding nothing
   in memory from previous runs, as a new process would, and answer the first query of `queries.txt`.
   The operating system cache and an open MongoDB connection may be reused, so it measures loading the
@@ -371,11 +387,11 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   not read, so only the index is measured. Every query is timed; a sample is the mean of one measured
   second.
 - `query_time_p99`: the 99th percentile of the query times of each measured second, over the queries
-  of `query_time`; its samples are those 15 percentiles. A search engine is judged by its slowest
+  of `query_time`; its samples are those 10 percentiles. A search engine is judged by its slowest
   queries as much as by its mean.
 - `query_time_<category>`: `query_time` restricted to the queries of one category of `queries.txt`,
   measured in the same run: each query is also timed on its own, and a sample is the mean time of the
-  queries of the category during one measured second (15 samples). Timing each query adds a few tens of
+  queries of the category during one measured second (10 samples). Timing each query adds a few tens of
   nanoseconds, which only matters for the fastest queries. The cost of a query depends mostly on how long
   the postings it reads and intersects are, and terms follow a Zipf distribution, so the workload has 5
   queries of each category:
@@ -391,7 +407,7 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `index_memory`: memory retained by an index of N books open for querying, i.e. heap in use after a
   full garbage collection with the index open and every query of `queries.txt` answered once, minus the
   same measure before opening it. Each process opens the index once without measuring it and then
-  measures 5 openings, so there are 15 samples. For `mongo` only the client side is measured, with the
+  measures 5 openings, so there are 10 samples. For `mongo` only the client side is measured, with the
   client already connected.
 - `term_count`: distinct terms in the index of N books.
 - `bulk_insertion_time`: time to save the metadata of N books one by one, through a single open backend,
@@ -399,8 +415,7 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, of the dataset.
 - For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`;
   that is already allocated storage, so `disk_allocated` equals it.
-- `build_memory` is measured once per process, so it has 3 samples (building again is expensive and its
-  variation is small); `term_count` is exact.
+- `build_memory` is measured 3 times per process, so it has 6 samples; `term_count` is exact.
 
 ## 12. Known limitations
 
@@ -413,6 +428,13 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   that compress data or store very small files inside their metadata take less than it reports.
 - The datalake is not synced to disk after each write, so `write_throughput` measures writes to the
   operating system cache.
+- Durability differs between metadata backends: SQLite commits every save to disk before it returns,
+  while MongoDB with its default write concern acknowledges a save before flushing its journal (within
+  100 ms). `bulk_insertion_time` favours MongoDB on that account.
+- MongoDB compresses collections and indexes on disk (WiredTiger), so its `disk_usage` is compressed while
+  that of `json` and `folders` is not.
+- Memory metrics count the Java heap: for `mongo` the index lives in the MongoDB server, whose memory
+  (its 1 GB cache) is not counted.
 
 ## 13. Conformance cases
 

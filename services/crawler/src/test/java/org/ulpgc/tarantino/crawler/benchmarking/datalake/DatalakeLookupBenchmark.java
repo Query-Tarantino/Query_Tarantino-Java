@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 2, jvmArgsAppend = {"-Xms4g", "-Xmx4g", "--sun-misc-unsafe-memory-access=allow"})
 public class DatalakeLookupBenchmark {
 
     @Param({"time", "book", "batch"})

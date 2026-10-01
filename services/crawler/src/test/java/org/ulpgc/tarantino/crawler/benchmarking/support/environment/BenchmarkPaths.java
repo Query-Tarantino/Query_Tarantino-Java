@@ -4,7 +4,7 @@ import java.nio.file.Path;
 
 public final class BenchmarkPaths {
 
-    // Spotlight skips directories whose name ends in .noindex, so it does not index the files benchmarks write
+    // macOS Spotlight skips directories whose name ends in .noindex; elsewhere the name is just a name
     private static final String SCRATCH_DIRECTORY = "tmp.noindex";
 
     private BenchmarkPaths() {

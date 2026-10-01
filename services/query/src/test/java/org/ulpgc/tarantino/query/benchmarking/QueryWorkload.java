@@ -21,11 +21,12 @@ final class QueryWorkload {
 
     static final String ALL_CATEGORIES = "all";
 
+    private static final Path BODY = Path.of("body.txt");
     // Metadata is not read by the index benchmarks, so only the index is measured
     private static final MetadataReader CONSTANT_METADATA = new MetadataReader() {
         @Override
         public Optional<BookMetadata> book(int bookId) {
-            return Optional.of(new BookMetadata(bookId, "title", "author", "English", Path.of("body.txt")));
+            return Optional.of(new BookMetadata(bookId, "title", "author", "English", BODY));
         }
 
         @Override

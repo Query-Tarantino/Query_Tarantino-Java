@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 0)
 @Measurement(iterations = 3)
-@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 2, jvmArgsAppend = {"-Xms4g", "-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class IncrementalUpdateBenchmark {
 
     // Flushing after every book is far slower (folders rewrites every term file of each book), so fewer books
@@ -47,6 +47,7 @@ public class IncrementalUpdateBenchmark {
     private List<Integer> newIds;
     private List<Integer> booksFlushedOneByOne;
     private Set<String> touchedTerms;
+    private InvertedIndexStorage invertedIndex;
 
     @Setup(Level.Trial)
     public void selectSnapshot() {
@@ -72,21 +73,27 @@ public class IncrementalUpdateBenchmark {
         warmUp.clear();
     }
 
+    /**
+     * Opens the index before timing, as a running control layer has it open: otherwise json's loading would be
+     * spread over 10 books in one method and over 100 in the other. Loading is measured by index_open_time.
+     */
     @Setup(Level.Iteration)
-    public void restoreIndex() {
+    public void restoreAndOpenIndex() {
         store.restoreTermsFrom(snapshot, touchedTerms);
+        invertedIndex = store.invertedIndex();
+        invertedIndex.open();
     }
 
-    /** As the control layer indexes (SPEC §9): one open index, flushed after every book. */
+    /** As the control layer indexes with K = 1 (SPEC §9): an open index, flushed after every book. */
     @Benchmark
     public void incrementalUpdateTime() {
-        InvertedIndexStorage invertedIndex = store.invertedIndex();
         booksFlushedOneByOne.forEach(bookId -> fixture.index(invertedIndex, List.of(bookId)));
     }
 
+    /** As the control layer indexes with the default K = 100: an open index, flushed once. */
     @Benchmark
     public void batchUpdateTime() {
-        fixture.index(store.invertedIndex(), newIds);
+        fixture.index(invertedIndex, newIds);
     }
 
 }

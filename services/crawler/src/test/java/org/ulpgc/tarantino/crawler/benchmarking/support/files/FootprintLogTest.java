@@ -30,16 +30,16 @@ class FootprintLogTest {
     }
 
     @Test
-    void drainsSamplesAsTheirMeanAnd999ConfidenceHalfWidth() {
+    void drainsSamplesAsTheirMeanAnd95ConfidenceHalfWidth() {
         Path samples = directory.resolve("samples.csv");
         List.of(10.0, 12.0, 14.0).forEach(value ->
                 FootprintLog.append(samples, List.of(ResultRow.sample("json", "build_memory", 100, value, "bytes"))));
 
         ResultRow mean = FootprintLog.drain(directory.resolve("exact.csv"), samples).getFirst();
 
-        // mean 12, standard deviation 2, t(0.9995, 2) = 31.599: 31.599 × 2 / √3 = 36.487
+        // mean 12, standard deviation 2, t(0.975, 2) = 4.303: 4.303 × 2 / √3 = 4.968
         assertEquals(12.0, mean.value(), 1e-9);
-        assertEquals(36.487, mean.error(), 1e-3);
+        assertEquals(4.968, mean.error(), 1e-3);
     }
 
     @Test

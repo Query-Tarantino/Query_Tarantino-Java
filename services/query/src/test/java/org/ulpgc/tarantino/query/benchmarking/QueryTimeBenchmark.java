@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 2, jvmArgsAppend = {"-Xms4g", "-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class QueryTimeBenchmark {
 
     // The first opening of each process is discarded: for mongo it also creates the client
@@ -104,6 +104,9 @@ public class QueryTimeBenchmark {
             return;
         }
         for (int category = 0; category < categories.size(); category++) {
+            if (queriesPerCategory[category] == 0) {
+                continue;
+            }
             double microsPerQuery = nanosPerCategory[category] / 1000.0 / queriesPerCategory[category];
             ResultRow sample = ResultRow.sample(index, "query_time_" + categories.get(category), books, microsPerQuery, "µs/query");
             FootprintLog.appendSample(BenchmarkRunner.SERVICE, sample);
