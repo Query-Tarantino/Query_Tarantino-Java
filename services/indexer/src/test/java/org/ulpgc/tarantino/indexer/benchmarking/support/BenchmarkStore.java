@@ -5,16 +5,19 @@ import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPat
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
 import org.ulpgc.tarantino.indexer.IndexerFactory;
+import org.ulpgc.tarantino.indexer.adapters.index.folders.TermFileRestore;
 import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.Set;
 
 public final class BenchmarkStore {
 
     private static final String MONGO = "mongo";
+    private static final String FOLDERS = "folders";
 
     private final IndexerConfig config;
     private final boolean mongo;
@@ -63,16 +66,32 @@ public final class BenchmarkStore {
         }
     }
 
+    /**
+     * Restores the snapshot after an update that only touched the given terms. For folders only their files
+     * are put back, instead of copying hundreds of thousands of files; the other structures are copied whole.
+     */
+    public void restoreTermsFrom(BenchmarkStore snapshot, Set<String> touchedTerms) {
+        if (FOLDERS.equals(config.index())) {
+            TermFileRestore.restore(snapshot.folderIndex(), folderIndex(), touchedTerms);
+        } else {
+            snapshot.copyTo(this);
+        }
+    }
+
     public long termCount() {
         return switch (config.index()) {
             case "json" -> jsonTermCount(config.datamarts().resolve("inverted_index.json"));
-            case "folders" -> Directories.fileCount(config.datamarts().resolve("inverted_index"));
+            case FOLDERS -> Directories.fileCount(folderIndex());
             default -> MongoStores.documentCount(config.mongoUri(), "inverted_index");
         };
     }
 
     public long diskUsage() {
         return mongo ? MongoStores.diskUsage(config.mongoUri()) : Directories.diskUsage(config.datamarts());
+    }
+
+    private Path folderIndex() {
+        return config.datamarts().resolve("inverted_index");
     }
 
     private static long jsonTermCount(Path file) {

@@ -31,8 +31,9 @@ it leaves behind, and number of files, directories and bytes.
 | `folders` | one `datamarts/inverted_index/<c>/<name>.txt` per term (name encoded, SPEC §8.1) | Fine-grained updates; very many small files |
 | `mongo`   | MongoDB collection, one document per term         | Indexed random access and concurrency; needs a server       |
 
-Compared on full build time, incremental update time, index open time, query time, memory retained while
-building and while open, allocated memory, number of terms and disk usage.
+Compared on full build time, incremental update time (book by book, as the control layer indexes, and in
+batch), index open time, query time, memory retained while building and while open, allocated memory, number
+of terms and disk usage.
 
 **3. Metadata: where title, author, language and path are stored** (PDF §4.1)
 
@@ -242,7 +243,7 @@ mvn verify -Pbenchmark -DskipTests                       # every service
 mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
 ```
 
-A full run with 100, 500, 1 000 and 2 000 books takes **about 4 hours**: each benchmark runs in 3 processes
+A full run with 100, 500, 1 000 and 2 000 books takes **about 5 hours**: each benchmark runs in 3 processes
 (SPEC §11), and a run with a single process took about 3 hours, most of it building the `folders` and
 `mongo` indexes with 2 000 books. These variables shorten it:
 
@@ -264,7 +265,7 @@ of [SPEC.md](SPEC.md#11-benchmarks); `benchmarks/<service>/jmh-results.csv` keep
 | Comparison               | Structures                 | Metrics                                                                  | Benchmarks                                                          |
 |--------------------------|----------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------|
 | Datalake (PDF 3.1)       | `time`, `book`, `batch`    | write throughput, lookup, new books detection, recovery and leftover files, files, disk | crawler `DatalakeWriteBenchmark`, `DatalakeLookupBenchmark`, `NewBooksDetectionBenchmark`, `RecoveryScenario` |
-| Inverted index (PDF 4.2) | `json`, `folders`, `mongo` | full build, incremental update, index open, query, build and index memory, allocations, terms, disk | indexer `FullIndexBuildBenchmark`, `IncrementalUpdateBenchmark`, query `IndexOpenBenchmark`, `QueryTimeBenchmark` |
+| Inverted index (PDF 4.2) | `json`, `folders`, `mongo` | full build, incremental update book by book and in batch, index open, query, build and index memory, allocations, terms, disk | indexer `FullIndexBuildBenchmark`, `IncrementalUpdateBenchmark`, query `IndexOpenBenchmark`, `QueryTimeBenchmark` |
 | Metadata (PDF 4.1)       | `sqlite`, `mongo`          | bulk insertion, book by id, books by author                              | indexer `MetadataInsertionBenchmark`, query `MetadataQueryBenchmark` |
 
 How every metric is measured, and the rules that keep results comparable across languages, are defined

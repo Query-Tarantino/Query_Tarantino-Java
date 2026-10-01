@@ -11,6 +11,10 @@ public record Metric(String name, String unit, Conversion conversion) {
         return new Metric(name, unit, (score, books) -> score);
     }
 
+    public static Metric perBook(String name, int booksPerRun) {
+        return new Metric(name, "ms/book", (milliseconds, books) -> milliseconds / booksPerRun);
+    }
+
     public static Metric booksPerSecond(String name) {
         return new Metric(name, "books/s", (milliseconds, books) -> books / (milliseconds / 1000));
     }

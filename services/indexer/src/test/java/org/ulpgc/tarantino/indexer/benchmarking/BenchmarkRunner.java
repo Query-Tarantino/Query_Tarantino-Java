@@ -9,6 +9,7 @@ import org.ulpgc.tarantino.crawler.benchmarking.support.files.ResultsFile;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.JmhResults;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.Metric;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
+import org.ulpgc.tarantino.indexer.benchmarking.index.IncrementalUpdateBenchmark;
 import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
 
 import java.util.Collection;
@@ -22,7 +23,8 @@ public class BenchmarkRunner {
 
     private static final Map<String, Metric> METRICS = Map.of(
             "fullBuildTime", Metric.asMeasured("full_build_time", "ms"),
-            "incrementalUpdateTime", Metric.asMeasured("incremental_update_time", "ms"),
+            "incrementalUpdateTime", Metric.perBook("incremental_update_time", IncrementalUpdateBenchmark.BOOKS_FLUSHED_ONE_BY_ONE),
+            "batchUpdateTime", Metric.perBook("batch_update_time", IncrementalUpdateBenchmark.BOOKS_FLUSHED_TOGETHER),
             "bulkInsertionTime", Metric.asMeasured("bulk_insertion_time", "ms"));
 
     public static void main(String[] args) throws RunnerException {

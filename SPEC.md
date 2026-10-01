@@ -235,16 +235,16 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
 - Each benchmark runs in **3 separate processes**. Each process runs warm-up iterations, which are
   discarded, and then measured iterations. Every measured iteration is one **sample**:
 
-| Kind of metric                                                              | Warm-up per process | Measured per process | Samples |
-|-----------------------------------------------------------------------------|---------------------|----------------------|--------:|
-| One whole run: write, full build, incremental update, insertion, index open | 1 run               | 3 runs               |       9 |
-| One operation: lookup, detection, query, metadata queries                   | 3 × 1 second        | 5 × 1 second         |      15 |
+| Kind of metric                                                                        | Warm-up per process | Measured per process | Samples |
+|---------------------------------------------------------------------------------------|---------------------|----------------------|--------:|
+| One whole run: write, full build, incremental and batch update, insertion, index open | 1 run               | 3 runs               |       9 |
+| One operation: lookup, detection, query, metadata queries                             | 3 × 1 second        | 5 × 1 second         |      15 |
 
   A sample of the first kind is the time of one run. A sample of the second kind is the mean time per
   operation during one second.
 - Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
-  except for the incremental update, where the index is restored to exactly the dataset of size N, and
-  index open, which only reads.
+  except for the incremental and batch updates, where the index is restored to exactly the dataset of
+  size N, and index open, which only reads.
 - The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 99.9%
   confidence interval of that mean, t₀.₉₉₉₅,ₙ₋₁ · s / √n over the n samples (what JMH reports as
   `Score Error`). Two structures are **tied** when their intervals overlap: |a − b| ≤ error(a) + error(b).
@@ -278,7 +278,8 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 |          |                              | `directory_count`          | dirs    |
 |          |                              | `disk_usage`               | bytes   |
 | Index    | `json`, `folders`, `mongo`   | `full_build_time`          | ms      |
-|          |                              | `incremental_update_time`  | ms      |
+|          |                              | `incremental_update_time`  | ms/book |
+|          |                              | `batch_update_time`        | ms/book |
 |          |                              | `index_open_time`          | ms      |
 |          |                              | `query_time`               | µs/query|
 |          |                              | `build_memory`             | bytes   |
@@ -309,8 +310,13 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   garbage too: it measures the pressure on the garbage collector, not the memory required.
 - `build_memory`: memory retained while building, i.e. heap in use after a full garbage collection once
   the N books are added and before the flush, minus the same measure before the build.
-- `incremental_update_time`: time to index the 100 new books into an index of exactly the N books of the
-  dataset, opening the index from storage as a new process would.
+- `incremental_update_time`: mean time per book to index the first 10 new books into an index of exactly
+  the N books of the dataset as the control layer does (§9): the index is opened from storage once, as a
+  new process would, and flushed after every book. Only 10 books, because flushing after each one is far
+  slower (`folders` rewrites every term file of every book).
+- `batch_update_time`: mean time per book to index the 100 new books into an index of exactly the N
+  books of the dataset with a single flush at the end, opening the index from storage first. Compared
+  with `incremental_update_time`, it shows what indexing in batches would save.
 - `index_open_time`: time to open an index of N books from storage with a new reader, holding nothing
   in memory from previous runs, as a new process would, and answer the first query of `queries.txt`.
   The operating system cache and an open MongoDB connection may be reused, so it measures loading the
