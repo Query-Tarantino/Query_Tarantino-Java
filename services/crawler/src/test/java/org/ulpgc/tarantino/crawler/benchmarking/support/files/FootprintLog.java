@@ -8,7 +8,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class FootprintLog {
 
@@ -35,7 +37,16 @@ public final class FootprintLog {
     }
 
     private static List<ResultRow> rows(Path file) throws IOException {
-        return Files.exists(file) ? Files.readAllLines(file).stream().map(ResultRow::parse).toList() : List.of();
+        if (!Files.exists(file)) {
+            return List.of();
+        }
+        Map<String, ResultRow> firstPerMeasure = new LinkedHashMap<>();
+        Files.readAllLines(file).stream().map(ResultRow::parse).forEach(row -> firstPerMeasure.putIfAbsent(measure(row), row));
+        return List.copyOf(firstPerMeasure.values());
+    }
+
+    private static String measure(ResultRow row) {
+        return String.join(",", row.structure(), row.metric(), String.valueOf(row.books()));
     }
 
     private static Path file(String service) {

@@ -35,8 +35,8 @@ public final class DatalakeFixture {
 
     public static List<ResultRow> footprint(String layout, int books, Path root) {
         return List.of(
-                new ResultRow(layout, "file_count", books, Directories.fileCount(root), "files"),
-                new ResultRow(layout, "directory_count", books, Directories.directoryCount(root), "dirs"),
-                new ResultRow(layout, "disk_usage", books, Directories.diskUsage(root), "bytes"));
+                ResultRow.exact(layout, "file_count", books, Directories.fileCount(root), "files"),
+                ResultRow.exact(layout, "directory_count", books, Directories.directoryCount(root), "dirs"),
+                ResultRow.exact(layout, "disk_usage", books, Directories.diskUsage(root), "bytes"));
     }
 }

@@ -22,7 +22,8 @@ public final class BenchmarkOptions {
         ChainedOptionsBuilder options = new OptionsBuilder()
                 .include("org\\.ulpgc\\.tarantino\\." + service + "\\.benchmarking\\..*")
                 .resultFormat(ResultFormatType.CSV)
-                .result(rawResultsFile(service));
+                .result(rawResultsFile(service))
+                .shouldFailOnError(true);
         applyOverrides(options);
         return options;
     }
@@ -44,7 +45,7 @@ public final class BenchmarkOptions {
     }
 
     private static void quick(ChainedOptionsBuilder options) {
-        options.warmupIterations(1).measurementIterations(1).warmupTime(QUICK_ITERATION).measurementTime(QUICK_ITERATION);
+        options.forks(1).warmupIterations(1).measurementIterations(1).warmupTime(QUICK_ITERATION).measurementTime(QUICK_ITERATION);
     }
 
     private static void withoutMongo(ChainedOptionsBuilder options) {

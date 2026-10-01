@@ -145,7 +145,9 @@ the structure has an order.
 ### 8.2 Metadata
 
 Fields: `book_id`, `title`, `author`, `language`, `path` (the body file of §6, see §1 for the format).
-Saving a book that already exists replaces its row or document.
+Saving a book that already exists replaces its row or document. Each backend opens its connection once
+and reuses it for every save and query; each save is committed before it returns, because §9 marks a
+book as indexed right after.
 
 | Backend  | Location                            | Schema |
 |----------|-------------------------------------|--------|
@@ -192,28 +194,61 @@ Author lookup is a case-insensitive substring match (ASCII case folding is enoug
 `<benchmarks>/cache/<id>.txt`, unchanged, following `book_ids.txt`, until the cache holds 2 800 books.
 Only books with both markers (§5) are cached; ids answered with 404 or without markers are listed in
 `<benchmarks>/cache/skipped.txt` and never retried, while network errors are retried on the next run.
-The dataset of size N is the first N ids of `book_ids.txt` present in the cache. Every implementation
-reads from the same cache, so the network is never measured.
+The cached ids, in `book_ids.txt` order, are the **cache order**. Every implementation reads from the
+same cache, so the network is never measured.
 
-**Sizes.** N ∈ {100, 500, 1000, 2000}. Each iteration of the incremental update, warm-up included, adds
-the next 100 cached books after the first N, so 3 + 5 iterations need N + 800 books: the cache holds
-2 800. New books detection stores N books as one day old and then 100 new ones.
+**Sizes.** N ∈ {100, 500, 1000, 2000}. The dataset of size N is the first N ids in cache order. The
+**new books** are always the same 100: positions 2001 to 2100 in cache order. They never belong to a
+dataset and are the same for every N, so results at different N differ only by N.
 
-**Execution.** Same machine for all languages, nothing else running, and the same MongoDB server
-(`mongo:7.0` from `docker-compose.yml`), using one database per benchmark. Each data point is the
-mean of the measured iterations:
+**Simulated download time.** The datalake benchmarks save the books of a dataset as a crawl
+downloading 100 books per hour would: the book at position i (0-based) is saved at T₀ + ⌊i / 100⌋ hours,
+so `time` spreads N books over ⌈N / 100⌉ hour directories. For `book` and `batch` that instant is also
+set as the modification time of the body file.
 
-| Kind of metric                                                    | Warm-up       | Measured      |
-|-------------------------------------------------------------------|---------------|---------------|
-| One whole run: write, full build, incremental update, insertion   | 3 runs        | 5 runs        |
-| One operation: lookup, detection, query, metadata queries         | 3 × 1 second  | 5 × 1 second  |
+**Execution.**
 
-Storage is emptied before every run of the first kind. Record CPU, RAM, OS and runtime versions.
+- Same machine for all languages, with nothing else running and `<benchmarks>` excluded from file
+  indexing (on macOS, an empty `<benchmarks>/.metadata_never_index` file).
+- Same MongoDB for all languages: **MongoDB 7.0 running natively** on the benchmark machine, with the
+  WiredTiger cache fixed at 1 GB (`storage.wiredTiger.engineConfig.cacheSizeGB: 1`), using one database
+  per benchmark. It must not run in a container: on macOS and Windows Docker runs a virtual machine that
+  reserves its own memory and adds a network round trip to every operation, so `mongo` would be measured
+  at a disadvantage. `docker-compose.yml` is only for development.
+- Record CPU, RAM, OS, runtime versions and the MongoDB version.
+- Each benchmark runs in **3 separate processes**. Each process runs warm-up iterations, which are
+  discarded, and then measured iterations. Every measured iteration is one **sample**:
+
+| Kind of metric                                                     | Warm-up per process | Measured per process | Samples |
+|--------------------------------------------------------------------|---------------------|----------------------|--------:|
+| One whole run: write, full build, incremental update, insertion    | 2 runs              | 3 runs               | 9       |
+| One operation: lookup, detection, query, metadata queries          | 3 × 1 second        | 5 × 1 second         | 15      |
+
+  A sample of the first kind is the time of one run. A sample of the second kind is the mean time per
+  operation during one second.
+- Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
+  except for the incremental update, where the index is restored to exactly the dataset of size N.
+- The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 99.9%
+  confidence interval of that mean, t₀.₉₉₉₅,ₙ₋₁ · s / √n over the n samples (what JMH reports as
+  `Score Error`). Two structures are **tied** when their intervals overlap: |a − b| ≤ error(a) + error(b).
+
+**Validation.** Before measuring, each benchmark checks that the structure gives the correct result,
+and the benchmark run fails without writing results otherwise:
+
+- Lookup: every book of the dataset is found, and both of its files exist.
+- New books detection: exactly the ids of the 100 new books.
+- Query: for every query of `queries.txt`, the same ids as a reference computed in memory from the
+  tokenized books of the dataset (§7, §10).
+- Metadata queries: every id returns the book with that id, and every author returns at least every
+  book of the dataset with exactly that author.
 
 **Results.** Each implementation writes `<benchmarks>/results/<language>-<service>.csv` with the header
-`language,structure,metric,n_books,value,unit`, e.g. `java,time,write_throughput,1000,812.4,books/s`.
+`language,structure,metric,n_books,value,error,unit`, e.g. `java,time,write_throughput,1000,812.4,35.2,books/s`.
+`error` is in the unit of the metric. It is `0` for exact metrics (counts, sizes and `recovery_ok`) and
+empty when it cannot be computed (fewer than 2 samples). For a value derived from a time, such as
+`write_throughput` = N / time, the error is the value times the relative error of the time.
 With the results of every language in that directory, `scripts/compare_results.py` builds the
-comparison report in `<benchmarks>/report/`.
+comparison report in `<benchmarks>/report/`, where tied structures share the first place.
 
 | Group    | Structures                   | Metric                     | Unit    |
 |----------|------------------------------|----------------------------|---------|
@@ -221,35 +256,55 @@ comparison report in `<benchmarks>/report/`.
 |          |                              | `lookup_time`              | µs/op   |
 |          |                              | `new_books_detection_time` | ms      |
 |          |                              | `recovery_ok`              | 0 or 1  |
+|          |                              | `recovery_leftover_files`  | files   |
 |          |                              | `file_count`               | files   |
 |          |                              | `directory_count`          | dirs    |
 |          |                              | `disk_usage`               | bytes   |
 | Index    | `json`, `folders`, `mongo`   | `full_build_time`          | ms      |
 |          |                              | `incremental_update_time`  | ms      |
+|          |                              | `index_open_time`          | ms      |
 |          |                              | `query_time`               | µs/query|
+|          |                              | `build_memory`             | bytes   |
+|          |                              | `index_memory`             | bytes   |
 |          |                              | `memory_allocated`         | bytes   |
+|          |                              | `term_count`               | terms   |
 |          |                              | `disk_usage`               | bytes   |
 | Metadata | `sqlite`, `mongo`            | `bulk_insertion_time`      | ms      |
 |          |                              | `book_by_id_time`          | µs/op   |
 |          |                              | `books_by_author_time`     | µs/op   |
 
 - `write_throughput`: N divided by the time to read, split (§5) and store the N cached books.
-- `lookup_time`: time to find the header and body of a random stored book.
-- `new_books_detection_time`: time to list the 100 new books (§6, new books detection).
+- `lookup_time`: time to find the header and body of a random book of the dataset.
+- `new_books_detection_time`: time to list the 100 new books (§6, new books detection). The N books of
+  the dataset are saved first, ending one day before the new ones, which are then saved at the current time.
 - `recovery_ok`: measured with 100 books. Half of them are ingested; the next one is interrupted after
   its header is written, leaving its body as `.tmp`; ingestion of all 100 is then run again one hour
   later. It is 1 if every book ends with exactly one body file, 0 otherwise.
+- `recovery_leftover_files`: after the same scenario, the number of files in the datalake that are
+  neither the header nor the body of a stored book (`.tmp` files and orphaned headers).
 - `file_count`, `directory_count`, `disk_usage`: the datalake after writing N books; directories do not
   count the root, and `disk_usage` is the sum of file sizes in bytes.
 - `full_build_time` and `memory_allocated`: time and bytes allocated to read, split, tokenize and index
-  N books into an empty index, flushing once at the end.
-- `incremental_update_time`: time to index 100 new books into an index of N books, opening the index
-  from storage as a new process would.
-- `query_time`: time of a random query of `queries.txt` against an index of N books; metadata is not
-  read, so only the index is measured.
-- `bulk_insertion_time`: time to save the metadata of N books into an empty backend.
-- `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, among N books.
+  N books into an empty index, flushing once at the end. `memory_allocated` counts garbage too: it
+  measures the pressure on the garbage collector, not the memory required.
+- `build_memory`: memory retained while building, i.e. heap in use after a full garbage collection once
+  the N books are added and before the flush, minus the same measure before the build.
+- `incremental_update_time`: time to index the 100 new books into an index of exactly the N books of the
+  dataset, opening the index from storage as a new process would.
+- `index_open_time`: time to open an index of N books from storage, as a new process would, and answer
+  the first query of `queries.txt`.
+- `query_time`: time of a random query of `queries.txt` against an open index of N books; metadata is
+  not read, so only the index is measured.
+- `index_memory`: memory retained by an index of N books open for querying, i.e. heap in use after a
+  full garbage collection with the index open and every query of `queries.txt` answered once, minus the
+  same measure before opening it. For `mongo` only the client side is measured.
+- `term_count`: distinct terms in the index of N books.
+- `bulk_insertion_time`: time to save the metadata of N books one by one, through a single open backend,
+  into an empty backend.
+- `book_by_id_time`, `books_by_author_time`: a random id, or the author of a random book, of the dataset.
 - For `mongo`, `disk_usage` is the `storageSize` + `totalIndexSize` of its collections after an `fsync`.
+- `build_memory`, `index_memory` and `term_count` are measured once per process; `build_memory` and
+  `index_memory` take their error over the 3 processes.
 
 ## 12. Known limitations
 
@@ -258,3 +313,7 @@ comparison report in `<benchmarks>/report/`.
 - Case mapping may differ between runtimes for a few rare characters; this is accepted.
 - Java `strip` does not remove U+00A0, U+2007 and U+202F, while Python and C# do. Header and body
   files may differ by those characters at their edges; terms are not affected.
+- `disk_usage` of files is their logical size, not the blocks allocated by the file system, so
+  structures with many small files (`folders`, `book`) take more disk space than reported.
+- The datalake is not synced to disk after each write, so `write_throughput` measures writes to the
+  operating system cache.

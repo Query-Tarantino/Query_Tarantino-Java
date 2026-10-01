@@ -52,6 +52,14 @@ public final class BenchmarkStore {
         }
     }
 
+    public void copyTo(BenchmarkStore target) {
+        target.clear();
+        Directories.copy(config.datamarts(), target.config.datamarts());
+        if (mongo) {
+            MongoStores.copy(config.mongoUri(), target.config.mongoUri());
+        }
+    }
+
     public long diskUsage() {
         return mongo ? MongoStores.diskUsage(config.mongoUri()) : Directories.diskUsage(config.datamarts());
     }

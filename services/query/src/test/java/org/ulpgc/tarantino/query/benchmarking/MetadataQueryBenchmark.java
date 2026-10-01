@@ -14,6 +14,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
 import org.ulpgc.tarantino.indexer.model.book.Book;
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(value = 1, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class MetadataQueryBenchmark {
 
     @Param({"sqlite", "mongo"})
@@ -57,6 +58,8 @@ public class MetadataQueryBenchmark {
         fixture.save(store.metadata(), parsedBooks);
         authors = parsedBooks.stream().map(Book::author).filter(Objects::nonNull).distinct().toList();
         reader = QueryFactory.metadata(config());
+        ids.forEach(this::requireBook);
+        parsedBooks.stream().filter(book -> book.author() != null).forEach(this::requireAmongBooksOfItsAuthor);
     }
 
     @Benchmark
@@ -72,6 +75,15 @@ public class MetadataQueryBenchmark {
     @TearDown(Level.Trial)
     public void deleteMetadata() {
         store.clear();
+    }
+
+    private void requireBook(int bookId) {
+        Check.require(reader.book(bookId).map(BookMetadata::bookId).equals(Optional.of(bookId)), "book " + bookId + " not found");
+    }
+
+    private void requireAmongBooksOfItsAuthor(Book book) {
+        boolean found = reader.booksBy(book.author()).stream().anyMatch(candidate -> candidate.bookId() == book.bookId());
+        Check.require(found, "book " + book.bookId() + " missing from the books of its author");
     }
 
     private QueryConfig config() {

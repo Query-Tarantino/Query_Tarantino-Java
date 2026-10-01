@@ -18,6 +18,10 @@ public final class Directories {
         entries(root).stream().sorted(Comparator.reverseOrder()).forEach(Directories::deleteEntry);
     }
 
+    public static void copy(Path source, Path target) {
+        entries(source).forEach(entry -> copyEntry(entry, target.resolve(source.relativize(entry))));
+    }
+
     public static long fileCount(Path root) {
         return fileCount(root, file -> true);
     }
@@ -40,6 +44,18 @@ public final class Directories {
         }
         try (Stream<Path> entries = Files.walk(root)) {
             return entries.toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void copyEntry(Path entry, Path target) {
+        try {
+            if (Files.isDirectory(entry)) {
+                Files.createDirectories(target);
+            } else {
+                Files.copy(entry, target);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

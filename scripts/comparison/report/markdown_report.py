@@ -23,7 +23,9 @@ class MarkdownReport:
     def _heading(self) -> list[str]:
         origins = ", ".join(f"`{origin}`" for origin in self._origins)
         return ["# Data structure comparison", "", f"Generated from {origins}.",
-                "Best value per language and size in **bold**.", ""]
+                "Values are the mean ± the half-width of its 99.9% confidence interval. Per language and size, "
+                "the best value and every value whose interval overlaps it are in **bold**: those structures "
+                "are tied.", ""]
 
     def _section(self, comparison: Comparison) -> list[str]:
         title = [f"## {comparison.title}: {', '.join(comparison.structures)}", "", "### Best structure", ""]

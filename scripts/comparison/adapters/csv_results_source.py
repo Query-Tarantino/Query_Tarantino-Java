@@ -26,4 +26,8 @@ class CsvResultsSource:
     @staticmethod
     def _result(row: dict[str, str]) -> Result:
         return Result(row["language"], row["structure"], row["metric"], int(row["n_books"]),
-                      float(row["value"]), row["unit"])
+                      float(row["value"]), row["unit"], CsvResultsSource._error(row.get("error")))
+
+    @staticmethod
+    def _error(text: str | None) -> float | None:
+        return float(text) if text else None

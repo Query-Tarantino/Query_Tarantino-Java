@@ -183,6 +183,7 @@
                                     <classpathScope>test</classpathScope>
                                     <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
                                     <arguments>
+                                        <argument>-Xmx1g</argument>
                                         <argument>--enable-native-access=ALL-UNNAMED</argument>
                                         <argument>--sun-misc-unsafe-memory-access=allow</argument>
                                         <argument>-classpath</argument>

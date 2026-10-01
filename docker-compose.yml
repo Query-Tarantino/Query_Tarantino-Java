@@ -1,3 +1,4 @@
+# Development only: the benchmarks require a native MongoDB 7.0 (SPEC §11, README).
 services:
   mongo:
     image: mongo:7.0

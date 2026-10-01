@@ -27,9 +27,11 @@ class MatplotlibChartRenderer:
     @staticmethod
     def _plot(axis: Axes, comparison: Comparison, language_results: list[Result]) -> None:
         for structure in comparison.structures:
-            points = sorted((result.books, result.value) for result in language_results if result.structure == structure)
+            points = sorted((result.books, result.value, result.margin())
+                            for result in language_results if result.structure == structure)
             if points:
-                axis.plot(*zip(*points), marker="o", label=structure)
+                books, values, margins = zip(*points)
+                axis.errorbar(books, values, yerr=margins, marker="o", capsize=3, label=structure)
         MatplotlibChartRenderer._label(axis, language_results[0])
 
     @staticmethod

@@ -12,13 +12,13 @@ class Ranking:
     def __init__(self, candidates: list[Result]):
         self._candidates = candidates
 
-    def best_value(self) -> float:
-        values = [candidate.value for candidate in self._candidates]
-        return max(values) if is_higher_better(self._candidates[0].metric) else min(values)
+    def best(self) -> Result:
+        choose = max if is_higher_better(self._candidates[0].metric) else min
+        return choose(self._candidates, key=lambda candidate: candidate.value)
 
     def winners(self) -> list[Result]:
-        best = self.best_value()
-        return [candidate for candidate in self._candidates if candidate.value == best]
+        best = self.best()
+        return [candidate for candidate in self._candidates if candidate.overlaps(best)]
 
     def winning_structures(self) -> list[str]:
         return list(dict.fromkeys(winner.structure for winner in self.winners()))

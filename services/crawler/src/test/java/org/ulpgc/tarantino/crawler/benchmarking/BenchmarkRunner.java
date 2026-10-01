@@ -53,6 +53,6 @@ public class BenchmarkRunner {
         Directories.delete(root);
         boolean recovered = new RecoveryScenario(layout, root, dataset::rawText).succeedsFor(dataset.ids(RECOVERY_BOOKS));
         Directories.delete(root);
-        return new ResultRow(layout, "recovery_ok", RECOVERY_BOOKS, recovered ? 1 : 0, "0 or 1");
+        return ResultRow.exact(layout, "recovery_ok", RECOVERY_BOOKS, recovered ? 1 : 0, "0 or 1");
     }
 }

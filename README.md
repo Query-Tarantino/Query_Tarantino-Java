@@ -100,18 +100,40 @@ The following directories are **created at runtime** in the project root and are
 
 - Java 25
 - Maven 3.9+
-- Docker, only for the `mongo` index or metadata backends and for their tests
+- MongoDB 7.0, only for the `mongo` index or metadata backends: installed natively for the benchmarks,
+  or in Docker for development
+- Docker, only for the tests of the MongoDB adapters
 - Python 3.10+ for the comparison report (matplotlib is optional and only adds charts)
 
-MongoDB runs in Docker with the version shared by every implementation:
+MongoDB 7.0 is the version shared by every implementation. **The benchmarks require it installed natively**
+(SPEC §11); on macOS:
 
 ```bash
-docker compose up -d          # start MongoDB 7.0 on localhost:27017, data kept in a volume
-docker compose down           # stop it (add -v to also delete the data)
+brew tap mongodb/brew && brew install mongodb-community@7.0
 ```
 
-Without the Compose plugin, `docker run -d --name tarantino-mongo -p 27017:27017 -v tarantino-mongo-data:/data/db mongo:7.0`
-is equivalent.
+Fix its cache at 1 GB, as the SPEC requires, by adding this to `/opt/homebrew/etc/mongod.conf` (by default
+MongoDB takes up to half of the RAM minus 1 GB, about 11.5 GB on a 24 GB machine):
+
+```yaml
+storage:
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 1
+```
+
+```bash
+brew services start mongodb-community@7.0   # start it on localhost:27017
+brew services stop mongodb-community@7.0    # stop it
+```
+
+On Linux and Windows, install MongoDB 7.0 Community from https://www.mongodb.com/try/download/community
+and set the same `cacheSizeGB` in its `mongod.conf`.
+
+For development only, `docker compose up -d` starts the same version in a container (`docker compose down`
+stops it, `-v` also deletes the data). It is not valid for benchmarking: on macOS and Windows Docker runs a
+virtual machine, which uses more memory (the VM reserves its own, 2 GB by default with Colima, on top of
+MongoDB) and adds a network round trip to every operation, so `mongo` would come out slower than it is.
 
 ## Configuration
 
@@ -209,7 +231,9 @@ default 16 parallel downloads (measured: about 12 books per second).
 
 ### Running
 
-MongoDB must be running for the `mongo` structures (`docker compose up -d`). From the project root:
+Native MongoDB must be running for the `mongo` structures (`brew services start mongodb-community@7.0`,
+see [Requirements](#requirements)); stop the Docker one first (`docker compose down`), since both use
+port 27017. From the project root:
 
 ```bash
 mvn -q install -DskipTests                               # build the services and the benchmark support jars
@@ -217,14 +241,14 @@ mvn verify -Pbenchmark -DskipTests                       # every service
 mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
 ```
 
-A full run with 100, 500, 1 000 and 2 000 books takes **about 1 hour** (estimated from measured runs with
-20 and 200 books), most of it building the `folders` and `mongo` indexes with 2 000 books. These variables
-shorten it:
+A full run with 100, 500, 1 000 and 2 000 books takes **about 6 hours**: each benchmark runs in 3 processes
+(SPEC §11), and a run with a single process took about 3 hours, most of it building the `folders` and
+`mongo` indexes with 2 000 books. These variables shorten it:
 
 | Variable                         | Effect                                                        |
 |----------------------------------|---------------------------------------------------------------|
 | `TARANTINO_BENCHMARK_BOOKS`      | Sizes to run, e.g. `100,500` (default `100,500,1000,2000`)     |
-| `TARANTINO_BENCHMARK_QUICK`      | `true`: 1 warm-up and 1 measured iteration, to check the setup |
+| `TARANTINO_BENCHMARK_QUICK`      | `true`: 1 process, 1 warm-up and 1 measured iteration, to check the setup |
 | `TARANTINO_BENCHMARK_SKIP_MONGO` | `true`: skip the `mongo` index and metadata structures        |
 
 ```bash

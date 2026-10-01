@@ -17,9 +17,11 @@ import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.DatalakeFixture
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
+import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(value = 1, jvmArgsAppend = {"-Xmx4g", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--sun-misc-unsafe-memory-access=allow"})
 public class DatalakeLookupBenchmark {
 
     @Param({"time", "book", "batch"})
@@ -52,6 +54,7 @@ public class DatalakeLookupBenchmark {
         Directories.delete(root);
         datalake = DatalakeFixture.datalake(layout, root);
         DatalakeFixture.store(datalake, ids, dataset);
+        ids.forEach(this::requireStored);
     }
 
     @Benchmark
@@ -62,5 +65,13 @@ public class DatalakeLookupBenchmark {
     @TearDown(Level.Trial)
     public void deleteDatalake() {
         Directories.delete(root);
+    }
+
+    private void requireStored(int bookId) {
+        Check.require(datalake.pathsOf(bookId).filter(DatalakeLookupBenchmark::bothExist).isPresent(), "book " + bookId + " not found");
+    }
+
+    private static boolean bothExist(StoredPaths paths) {
+        return Files.exists(paths.header()) && Files.exists(paths.body());
     }
 }

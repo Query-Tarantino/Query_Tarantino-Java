@@ -14,6 +14,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
+import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
 import org.ulpgc.tarantino.query.QueryConfig;
@@ -21,6 +22,7 @@ import org.ulpgc.tarantino.query.QueryFactory;
 import org.ulpgc.tarantino.query.adapters.stopwords.FileStopwordsLoader;
 import org.ulpgc.tarantino.query.commands.SearchCommand;
 import org.ulpgc.tarantino.query.model.BookMetadata;
+import org.ulpgc.tarantino.query.model.QueryTerms;
 import org.ulpgc.tarantino.query.model.SearchResult;
 import org.ulpgc.tarantino.query.ports.MetadataReader;
 
@@ -28,7 +30,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -39,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(value = 1, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class QueryTimeBenchmark {
 
     private static final MetadataReader CONSTANT_METADATA = new MetadataReader() {
@@ -62,6 +67,7 @@ public class QueryTimeBenchmark {
 
     private BenchmarkStore store;
     private SearchCommand search;
+    private Set<String> stopwords;
     private List<String> queries;
 
     @Setup(Level.Trial)
@@ -69,9 +75,12 @@ public class QueryTimeBenchmark {
         store = BenchmarkStore.forIndex(index, "query-index-" + index + "-" + books);
         store.clear();
         IndexFixture fixture = IndexFixture.fromEnvironment();
-        fixture.index(store.invertedIndex(), fixture.dataset().ids(books));
-        search = new SearchCommand(QueryFactory.invertedIndex(config()), CONSTANT_METADATA, stopwords());
+        List<Integer> ids = fixture.dataset().ids(books);
+        fixture.index(store.invertedIndex(), ids);
+        stopwords = stopwords();
+        search = new SearchCommand(QueryFactory.invertedIndex(config()), CONSTANT_METADATA, stopwords);
         queries = queries();
+        requireReferenceResults(fixture, ids);
     }
 
     @Benchmark
@@ -82,6 +91,33 @@ public class QueryTimeBenchmark {
     @TearDown(Level.Trial)
     public void deleteIndex() {
         store.clear();
+    }
+
+    private void requireReferenceResults(IndexFixture fixture, List<Integer> ids) {
+        Map<String, List<Integer>> expected = referenceResults(fixture, ids);
+        queries.forEach(query -> Check.require(resultIds(query).equals(expected.get(query)), "wrong result for query '" + query + "'"));
+    }
+
+    private Map<String, List<Integer>> referenceResults(IndexFixture fixture, List<Integer> ids) {
+        Map<String, Set<String>> termsOfQuery = new HashMap<>();
+        Map<String, List<Integer>> expected = new HashMap<>();
+        queries.forEach(query -> {
+            termsOfQuery.put(query, QueryTerms.of(query, stopwords));
+            expected.put(query, new ArrayList<>());
+        });
+        for (int bookId : ids.stream().sorted().toList()) {
+            Set<String> bookTerms = fixture.terms(bookId);
+            termsOfQuery.forEach((query, terms) -> {
+                if (!terms.isEmpty() && bookTerms.containsAll(terms)) {
+                    expected.get(query).add(bookId);
+                }
+            });
+        }
+        return expected;
+    }
+
+    private List<Integer> resultIds(String query) {
+        return search.execute(query).books().stream().map(BookMetadata::bookId).toList();
     }
 
     private QueryConfig config() {

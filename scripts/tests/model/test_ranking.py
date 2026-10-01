@@ -21,6 +21,12 @@ class RankingTest(unittest.TestCase):
 
         self.assertEqual(["time", "book"], ranking.winning_structures())
 
+    def test_structures_whose_interval_overlaps_the_best_one_are_tied(self):
+        ranking = Ranking([result("book", value=0.75, error=0.32), result("batch", value=1.05, error=2.84),
+                           result("time", value=3291, error=500)])
+
+        self.assertEqual(["book", "batch"], ranking.winning_structures())
+
     def test_a_single_candidate_is_not_highlighted_as_winner(self):
         alone = result("time")
 

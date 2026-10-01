@@ -14,4 +14,9 @@ public record Metric(String name, String unit, Conversion conversion) {
     public static Metric booksPerSecond(String name) {
         return new Metric(name, "books/s", (milliseconds, books) -> books / (milliseconds / 1000));
     }
+
+    public ResultRow row(String structure, int books, double score, double scoreError) {
+        double value = conversion.value(score, books);
+        return new ResultRow(structure, name, books, value, Math.abs(value * scoreError / score), unit);
+    }
 }

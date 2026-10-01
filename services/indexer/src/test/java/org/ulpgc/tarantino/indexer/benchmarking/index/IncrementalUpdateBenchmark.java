@@ -22,12 +22,10 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 3)
-@Measurement(iterations = 5)
-@Fork(value = 1, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
+@Warmup(iterations = 2)
+@Measurement(iterations = 3)
+@Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class IncrementalUpdateBenchmark {
-
-    private static final int NEW_BOOKS = 100;
 
     @Param({"json", "folders", "mongo"})
     public String index;
@@ -36,21 +34,23 @@ public class IncrementalUpdateBenchmark {
     public int books;
 
     private IndexFixture fixture;
+    private BenchmarkStore snapshot;
     private BenchmarkStore store;
-    private int updates;
     private List<Integer> newIds;
 
     @Setup(Level.Trial)
-    public void buildIndex() {
+    public void buildSnapshot() {
         fixture = IndexFixture.fromEnvironment();
+        snapshot = BenchmarkStore.forIndex(index, "index-update-snapshot-" + index + "-" + books);
         store = BenchmarkStore.forIndex(index, "index-update-" + index + "-" + books);
-        store.clear();
-        fixture.index(store.invertedIndex(), fixture.dataset().ids(books));
+        snapshot.clear();
+        fixture.index(snapshot.invertedIndex(), fixture.dataset().ids(books));
+        newIds = fixture.dataset().newIds();
     }
 
     @Setup(Level.Iteration)
-    public void selectNewBooks() {
-        newIds = fixture.dataset().ids(books + NEW_BOOKS * updates++, NEW_BOOKS);
+    public void restoreIndex() {
+        snapshot.copyTo(store);
     }
 
     @Benchmark
@@ -59,7 +59,8 @@ public class IncrementalUpdateBenchmark {
     }
 
     @TearDown(Level.Trial)
-    public void deleteIndex() {
+    public void deleteIndexes() {
         store.clear();
+        snapshot.clear();
     }
 }

@@ -10,6 +10,9 @@ import java.util.List;
 
 public final class BenchmarkDataset {
 
+    public static final int NEW_BOOKS = 100;
+    private static final int NEW_BOOKS_OFFSET = 2000;
+
     private final Path cache;
     private final Path bookIds;
     private List<Integer> cachedIds;
@@ -25,6 +28,10 @@ public final class BenchmarkDataset {
 
     public List<Integer> ids(int count) {
         return ids(0, count);
+    }
+
+    public List<Integer> newIds() {
+        return ids(NEW_BOOKS_OFFSET, NEW_BOOKS);
     }
 
     public List<Integer> ids(int offset, int count) {

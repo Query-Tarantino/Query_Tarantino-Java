@@ -14,6 +14,7 @@ import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 public final class IndexFixture {
 
@@ -46,6 +47,10 @@ public final class IndexFixture {
 
     public List<Book> books(List<Integer> ids) {
         return ids.stream().map(this::bookText).map(headerParser::book).toList();
+    }
+
+    public Set<String> terms(int bookId) {
+        return occurrences(bookId).frequencies().keySet();
     }
 
     private TermOccurrences occurrences(int bookId) {
