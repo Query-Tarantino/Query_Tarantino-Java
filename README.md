@@ -56,7 +56,7 @@ services/
   query/      searches the datamarts
   control/    orchestrates crawler -> indexer and tracks progress in control files
 scripts/
-  fill_cache.sh        downloads the benchmark dataset from the official Gutenberg mirror
+  fill_cache.sh        copies the benchmark dataset from Gutenberg's official mirrors (rsync, or HTTP)
   compare_results.py   builds the data structure comparison report from the benchmark results
   comparison/          its code: model/, ports/, adapters/ (CSV, charts), report/ (Markdown), commands/
   tests/               unit tests of comparison/, in the same package layout
@@ -154,6 +154,7 @@ Every setting has a default that works when running from the project root. Overr
 | `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`        |
 | `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string        |
 | `TARANTINO_INDEX_BATCH`     | `100`                       | books indexed per index flush by the control service (1 = book by book) |
+| `TARANTINO_MIRROR`          | (none)                      | local copy of Gutenberg's generated collection to read books from instead of downloading them |
 
 The crawler and the indexer must use the same `TARANTINO_DATALAKE_LAYOUT`; the indexer and the query service must use
 the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
@@ -162,7 +163,17 @@ the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
 
 Every service is a plain Java program run through Maven from a terminal; no IDE is needed.
 Always run from the **project root**, so `datalake/`, `datamarts/` and `control/` are created there.
-Books are downloaded from the official Project Gutenberg mirror `mirror.cs.odu.edu`.
+Books are downloaded from the official Project Gutenberg mirror `mirror.cs.odu.edu`, one request per book.
+For many books, copy them first in bulk with rsync, Project Gutenberg's documented way to mirror its
+collection, and point `TARANTINO_MIRROR` at the copy; the crawler then reads them from disk:
+
+```bash
+rsync -av --include='*/' --include='pg[0-9]*.txt' --exclude='*' rsync.ibiblio.org::gutenberg-epub/ ~/gutenberg-txt/
+export TARANTINO_MIRROR=~/gutenberg-txt
+```
+
+Copying every plain text takes some tens of gigabytes. Networks that block the rsync port (873), as some
+university networks do, need another connection.
 
 **1. Build once.** The control service uses the crawler and indexer jars, so install them all:
 
@@ -232,13 +243,25 @@ project root; it can be interrupted and resumes where it stopped:
 scripts/fill_cache.sh
 ```
 
-It downloads from the official mirror `mirror.cs.odu.edu`, following `workload/book_ids.txt`, until
-`benchmarks/cache/` holds 2 800 books with Gutenberg markers (ids without them are listed in
-`benchmarks/cache/skipped.txt`). `TARANTINO_CACHE_BOOKS` changes the target and
-`TARANTINO_CACHE_PARALLEL` the number of simultaneous downloads (default 16).
+It follows `workload/book_ids.txt` until `benchmarks/cache/` holds 2 800 books with Gutenberg markers (ids
+missing or without them are listed in `benchmarks/cache/skipped.txt`). By default it copies the candidates
+from `rsync.ibiblio.org::gutenberg-epub` in one rsync transfer, into `benchmarks/mirror/`, and moves the valid
+ones to the cache. Where the rsync port is blocked, download them over HTTP instead:
 
-The dataset is about 1.3 GB (2 800 books of 470 KB on average) and downloads in **about 4 minutes** with the
-default 16 parallel downloads (measured: about 12 books per second).
+```bash
+TARANTINO_CACHE_SOURCE=http scripts/fill_cache.sh
+```
+
+| Variable                   | Effect                                                              |
+|----------------------------|---------------------------------------------------------------------|
+| `TARANTINO_CACHE_BOOKS`    | Books to cache (default 2800)                                       |
+| `TARANTINO_CACHE_SOURCE`   | `rsync` (default) or `http`                                         |
+| `TARANTINO_RSYNC_SOURCE`   | rsync module (default `rsync.ibiblio.org::gutenberg-epub`)          |
+| `TARANTINO_CACHE_PARALLEL` | Simultaneous HTTP downloads (default 16)                            |
+
+The dataset is about 1.3 GB (2 800 books of 470 KB on average). Over HTTP it downloads in about 4 minutes
+with 16 parallel downloads (measured: about 12 books per second); rsync copies it in one transfer, limited
+only by the bandwidth.
 
 ### Running
 

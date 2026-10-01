@@ -33,6 +33,7 @@ and SQLite page layout are free. Everything else in this document is normative.
 | `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`          |
 | `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string          |
 | `TARANTINO_INDEX_BATCH`     | `100`                       | positive integer           |
+| `TARANTINO_MIRROR`          | (none)                      | path, or empty             |
 
 An unknown value is a configuration error and must stop the service with a message naming the value.
 
@@ -58,6 +59,14 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
 - HTTP 200 returns the text. HTTP 404 fails with `NOT_FOUND`. Any other status, timeout or I/O error
   fails with `NETWORK_ERROR`. A 30 second timeout is recommended.
 - A failed download stores nothing.
+- **Local mirror.** When `TARANTINO_MIRROR` is set, the crawler reads `<mirror>/<id>/pg<id>.txt` from a
+  local copy of the same generated collection instead of downloading it, decoded as UTF-8. A missing file
+  fails with `NOT_FOUND` and any other I/O error with `NETWORK_ERROR`. The copy is made in bulk with
+  rsync, Project Gutenberg's documented way to mirror the collection (the website itself is for human
+  users only), for example
+  `rsync -av --include='*/' --include='pg[0-9]*.txt' --exclude='*' rsync.ibiblio.org::gutenberg-epub/ <mirror>/`
+  for the plain texts alone. One transfer instead of one request per book is what makes a collection of
+  hundreds of thousands of books practical to ingest.
 
 ## 5. Header and body split
 
@@ -219,10 +228,13 @@ Author lookup is a case-insensitive substring match (ASCII case folding is enoug
 
 ## 11. Benchmarks
 
-**Dataset.** `scripts/fill_cache.sh` downloads raw texts once from the official mirror (§4) to
-`<benchmarks>/cache/<id>.txt`, unchanged, following `book_ids.txt`, until the cache holds 2 800 books.
-Only books with both markers (§5) are cached; ids answered with 404 or without markers are listed in
-`<benchmarks>/cache/skipped.txt` and never retried, while network errors are retried on the next run.
+**Dataset.** `scripts/fill_cache.sh` copies raw texts once to `<benchmarks>/cache/<id>.txt`, unchanged,
+following `book_ids.txt`, until the cache holds 2 800 books. By default it copies the candidates in one
+rsync transfer from `rsync.ibiblio.org::gutenberg-epub` (§4, local mirror) to `<benchmarks>/mirror/`;
+with `TARANTINO_CACHE_SOURCE=http`, for networks that block the rsync port, it downloads them over HTTP
+(§4), 16 at a time. Both give the same files. Only books with both markers (§5) are cached; missing ids
+(404 or absent from the mirror) and ids without markers are listed in `<benchmarks>/cache/skipped.txt` and
+never retried, while network errors are retried on the next run.
 The cached ids, in `book_ids.txt` order, are the **cache order**. Every implementation reads from the
 same cache, so the network is never measured.
 
