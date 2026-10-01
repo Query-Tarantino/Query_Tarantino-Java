@@ -288,8 +288,9 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `file_count`, `directory_count`, `disk_usage`: the datalake after writing N books; directories do not
   count the root, and `disk_usage` is the sum of file sizes in bytes.
 - `full_build_time` and `memory_allocated`: time and bytes allocated to read, split, tokenize and index
-  N books into an empty index, flushing once at the end. `memory_allocated` counts garbage too: it
-  measures the pressure on the garbage collector, not the memory required.
+  N books into an empty index, flushing once at the end. `memory_allocated` is counted by every thread
+  around the build alone, never around emptying the storage, one sample per measured run. It counts
+  garbage too: it measures the pressure on the garbage collector, not the memory required.
 - `build_memory`: memory retained while building, i.e. heap in use after a full garbage collection once
   the N books are added and before the flush, minus the same measure before the build.
 - `incremental_update_time`: time to index the 100 new books into an index of exactly the N books of the

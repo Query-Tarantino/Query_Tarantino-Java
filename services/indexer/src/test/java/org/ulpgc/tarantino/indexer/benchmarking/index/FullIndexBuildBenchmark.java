@@ -13,6 +13,8 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.IterationParams;
+import org.openjdk.jmh.runner.IterationType;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.Heap;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
@@ -42,6 +44,8 @@ public class FullIndexBuildBenchmark {
     private IndexFixture fixture;
     private BenchmarkStore store;
     private List<Integer> ids;
+    private boolean measured;
+    private long allocated;
 
     @Setup(Level.Trial)
     public void selectBooks() {
@@ -51,13 +55,24 @@ public class FullIndexBuildBenchmark {
     }
 
     @Setup(Level.Iteration)
-    public void emptyIndex() {
+    public void emptyIndex(IterationParams iteration) {
         store.clear();
+        measured = iteration.getType() == IterationType.MEASUREMENT;
     }
 
     @Benchmark
     public void fullBuildTime() {
+        long before = Heap.allocatedSoFar();
         fixture.index(store.invertedIndex(), ids);
+        allocated = Heap.allocatedSoFar() - before;
+    }
+
+    // Measured here and not with JMH's GC profiler, which also counts iteration setup and trial teardown
+    @TearDown(Level.Iteration)
+    public void recordAllocations() {
+        if (measured) {
+            FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "memory_allocated", books, allocated, "bytes"));
+        }
     }
 
     @TearDown(Level.Trial)
