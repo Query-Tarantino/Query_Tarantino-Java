@@ -280,6 +280,12 @@ of [SPEC.md](SPEC.md#11-benchmarks); `benchmarks/<service>/jmh-results.csv` keep
 How every metric is measured, and the rules that keep results comparable across languages, are defined
 in [SPEC.md](SPEC.md#11-benchmarks).
 
+When comparing languages, note that the Java tokenizer scans code points with `Character.isLetter` instead of
+matching `\p{L}+` with a regular expression. It finds exactly the same terms (`TokenizerEquivalenceTest`
+checks it against the regular expression on thousands of texts, and the SPEC conformance cases pass), but it
+is about 1.6 times faster and allocates half the memory (200 books: 1.15 s and 1.2 GB instead of 1.9 s and
+2.6 GB), which shortens Java's build and update times and lowers its `memory_allocated`.
+
 ### Comparing the structures
 
 `scripts/compare_results.py` reads every CSV in `benchmarks/results/` and writes
