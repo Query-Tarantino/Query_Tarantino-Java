@@ -31,7 +31,7 @@ public class MetadataInsertionBenchmark {
     @Param({"sqlite", "mongo"})
     public String metadata;
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "300", "1000"})
     public int books;
 
     private IndexFixture fixture;

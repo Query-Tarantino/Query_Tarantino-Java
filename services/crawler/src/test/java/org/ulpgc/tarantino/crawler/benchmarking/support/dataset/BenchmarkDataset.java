@@ -11,7 +11,7 @@ import java.util.List;
 public final class BenchmarkDataset {
 
     public static final int NEW_BOOKS = 100;
-    private static final int NEW_BOOKS_OFFSET = 2000;
+    private static final int NEW_BOOKS_OFFSET = 1000;
 
     private final Path cache;
     private final Path bookIds;

@@ -37,15 +37,17 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 1)
+@Warmup(iterations = 0)
 @Measurement(iterations = 3)
 @Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class FullIndexBuildBenchmark {
 
+    private static final int WARM_UP_BOOKS = 100;
+
     @Param({"json", "folders", "mongo"})
     public String index;
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "300", "1000"})
     public int books;
 
     private IndexFixture fixture;
@@ -61,6 +63,15 @@ public class FullIndexBuildBenchmark {
         store = BenchmarkStore.forIndex(index, "index-build-" + index + "-" + books);
         ids = fixture.dataset().ids(books);
         referenceTermCount = referenceTermCount();
+        warmUp();
+    }
+
+    /** Warms the JIT up with the same code on 100 books instead of a whole warm-up build of N (SPEC §11). */
+    private void warmUp() {
+        BenchmarkStore warmUp = BenchmarkStore.forIndex(index, "index-build-warmup-" + index);
+        warmUp.clear();
+        fixture.index(warmUp.invertedIndex(), fixture.dataset().ids(WARM_UP_BOOKS));
+        warmUp.clear();
     }
 
     @Setup(Level.Iteration)

@@ -238,8 +238,9 @@ never retried, while network errors are retried on the next run.
 The cached ids, in `book_ids.txt` order, are the **cache order**. Every implementation reads from the
 same cache, so the network is never measured.
 
-**Sizes.** N ∈ {100, 500, 1000, 2000}. The dataset of size N is the first N ids in cache order. The
-**new books** are always the same 100: positions 2001 to 2100 in cache order. They never belong to a
+**Sizes.** N ∈ {100, 300, 1000}, evenly spread on a logarithmic scale. The dataset of size N is the first
+N ids in cache order. The
+**new books** are always the same 100: positions 1001 to 1100 in cache order. They never belong to a
 dataset and are the same for every N, so results at different N differ only by N.
 
 **Simulated download time.** The datalake benchmarks save the books of a dataset as a crawl
@@ -262,11 +263,15 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
 - Each benchmark runs in **3 separate processes**. Each process runs warm-up iterations, which are
   discarded, and then measured iterations. Every measured iteration is one **sample**:
 
-| Kind of metric                                                                        | Warm-up per process | Measured per process | Samples |
-|---------------------------------------------------------------------------------------|---------------------|----------------------|--------:|
-| One whole run: write, full build, incremental and batch update, insertion, index open | 1 run               | 3 runs               |       9 |
-| One operation: lookup, detection, query, metadata queries                             | 3 × 1 second        | 5 × 1 second         |      15 |
+| Kind of metric                                            | Warm-up per process                                 | Measured per process | Samples |
+|-----------------------------------------------------------|-----------------------------------------------------|----------------------|--------:|
+| Full build                                                | building 100 books                                  | 3 runs               |       9 |
+| Incremental and batch update                              | updating an empty index with the first 10 new books | 3 runs               |       9 |
+| Other whole runs: write, insertion, index open            | 1 run                                               | 3 runs               |       9 |
+| One operation: lookup, detection, query, metadata queries | 3 × 1 second                                        | 5 × 1 second         |      15 |
 
+  Warming up only compiles the code, so full builds and updates warm up on a small input with the same code
+  instead of a whole run of N books, which for `folders` alone would cost minutes per process.
   A sample of the first kind is the time of one run. A sample of the second kind is the mean time per
   operation during one second.
 - Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
@@ -368,9 +373,12 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 - `query_time_p99`: the 99th percentile of the query times of each measured second, over the queries
   of `query_time`; its samples are those 15 percentiles. A search engine is judged by its slowest
   queries as much as by its mean.
-- `query_time_<category>`: `query_time` restricted to the queries of one category of `queries.txt`.
-  The cost of a query depends mostly on how long the postings it reads and intersects are, and terms
-  follow a Zipf distribution, so the workload has 5 queries of each category:
+- `query_time_<category>`: `query_time` restricted to the queries of one category of `queries.txt`,
+  measured in the same run: each query is also timed on its own, and a sample is the mean time of the
+  queries of the category during one measured second (15 samples). Timing each query adds a few tens of
+  nanoseconds, which only matters for the fastest queries. The cost of a query depends mostly on how long
+  the postings it reads and intersects are, and terms follow a Zipf distribution, so the workload has 5
+  queries of each category:
 
   | Category   | Queries                                                | Postings read            |
   |------------|--------------------------------------------------------|--------------------------|

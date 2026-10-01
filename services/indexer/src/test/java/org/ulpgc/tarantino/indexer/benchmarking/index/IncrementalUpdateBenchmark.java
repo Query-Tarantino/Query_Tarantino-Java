@@ -11,7 +11,6 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
@@ -27,7 +26,7 @@ import java.util.stream.Collectors;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 1)
+@Warmup(iterations = 0)
 @Measurement(iterations = 3)
 @Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class IncrementalUpdateBenchmark {
@@ -39,7 +38,7 @@ public class IncrementalUpdateBenchmark {
     @Param({"json", "folders", "mongo"})
     public String index;
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "300", "1000"})
     public int books;
 
     private IndexFixture fixture;
@@ -48,26 +47,34 @@ public class IncrementalUpdateBenchmark {
     private List<Integer> newIds;
     private List<Integer> booksFlushedOneByOne;
     private Set<String> touchedTerms;
-    private boolean copied;
 
     @Setup(Level.Trial)
     public void selectSnapshot() {
         fixture = IndexFixture.fromEnvironment();
         snapshot = PrebuiltIndexes.of(index, books, fixture);
-        store = BenchmarkStore.forIndex(index, "index-update-" + index + "-" + books);
+        store = PrebuiltIndexes.workingCopyOf(snapshot, index, books);
         newIds = fixture.dataset().newIds();
         booksFlushedOneByOne = newIds.subList(0, BOOKS_FLUSHED_ONE_BY_ONE);
         touchedTerms = newIds.stream().flatMap(bookId -> fixture.terms(bookId).stream()).collect(Collectors.toSet());
+        warmUp();
+    }
+
+    /**
+     * Warms the JIT up with the same code instead of a whole warm-up run (SPEC §11): the first new books indexed
+     * into an empty index one by one, which creates their term files, and then together, which merges them.
+     */
+    private void warmUp() {
+        BenchmarkStore warmUp = BenchmarkStore.forIndex(index, "index-update-warmup-" + index);
+        warmUp.clear();
+        InvertedIndexStorage invertedIndex = warmUp.invertedIndex();
+        booksFlushedOneByOne.forEach(bookId -> fixture.index(invertedIndex, List.of(bookId)));
+        fixture.index(warmUp.invertedIndex(), booksFlushedOneByOne);
+        warmUp.clear();
     }
 
     @Setup(Level.Iteration)
     public void restoreIndex() {
-        if (copied) {
-            store.restoreTermsFrom(snapshot, touchedTerms);
-        } else {
-            snapshot.copyTo(store);
-            copied = true;
-        }
+        store.restoreTermsFrom(snapshot, touchedTerms);
     }
 
     /** As the control layer indexes (SPEC §9): one open index, flushed after every book. */
@@ -82,8 +89,4 @@ public class IncrementalUpdateBenchmark {
         fixture.index(store.invertedIndex(), newIds);
     }
 
-    @TearDown(Level.Trial)
-    public void deleteIndex() {
-        store.clear();
-    }
 }

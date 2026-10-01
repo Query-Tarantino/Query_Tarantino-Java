@@ -44,7 +44,7 @@ building and while open, allocated memory, number of terms and disk usage (logic
 
 Compared on bulk insertion time, lookup by id and search by author.
 
-Every comparison runs at 100, 500, 1 000 and 2 000 books to show how each structure scales. See
+Every comparison runs at 100, 300 and 1 000 books to show how each structure scales. See
 [Benchmarks](#benchmarks) to run them and generate the comparison report.
 
 ## Repository structure
@@ -275,13 +275,15 @@ mvn verify -Pbenchmark -DskipTests                       # every service
 mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
 ```
 
-A full run with 100, 500, 1 000 and 2 000 books takes **about 6 hours**: each benchmark runs in 3 processes
-(SPEC §11), and a run with a single process took about 3 hours, most of it building the `folders` and
-`mongo` indexes with 2 000 books. These variables shorten it:
+A full run with 100, 300 and 1 000 books takes **about 1 hour 15 minutes** (estimated): every benchmark runs
+in 3 processes (SPEC §11), and most of the time goes to building and updating the `folders` index, one file
+per term. The time was kept down without losing samples: builds and updates warm up on a few books, the
+copy of the index that updates work on is made once per run, and one query run measures every category.
+These variables shorten it further:
 
 | Variable                         | Effect                                                        |
 |----------------------------------|---------------------------------------------------------------|
-| `TARANTINO_BENCHMARK_BOOKS`      | Sizes to run, e.g. `100,500` (default `100,500,1000,2000`)     |
+| `TARANTINO_BENCHMARK_BOOKS`      | Sizes to run, e.g. `100,300` (default `100,300,1000`)          |
 | `TARANTINO_BENCHMARK_QUICK`      | `true`: 1 process, 1 warm-up and 1 measured iteration, to check the setup |
 | `TARANTINO_BENCHMARK_SKIP_MONGO` | `true`: skip the `mongo` index and metadata structures        |
 

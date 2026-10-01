@@ -35,7 +35,7 @@ public class DatalakeWriteBenchmark {
     @Param({"time", "book", "batch"})
     public String layout;
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "300", "1000"})
     public int books;
 
     private final BenchmarkDataset dataset = BenchmarkDataset.fromEnvironment();

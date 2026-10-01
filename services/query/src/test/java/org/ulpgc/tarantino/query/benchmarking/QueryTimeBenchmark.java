@@ -11,7 +11,10 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.IterationParams;
+import org.openjdk.jmh.runner.IterationType;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.Heap;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
@@ -48,18 +51,18 @@ public class QueryTimeBenchmark {
     @Param({"json", "folders", "mongo"})
     public String index;
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "300", "1000"})
     public int books;
-
-    // all: every query of queries.txt, also reported as the 99th percentile; the others, one category each
-    @Param({QueryWorkload.ALL_CATEGORIES, "frequent", "rare", "mixed", "long", "empty", "nonascii"})
-    public String category;
 
     private BenchmarkStore store;
     private SearchCommand search;
     private Set<String> stopwords;
     private List<String> queries;
-    private List<String> measured;
+    private List<String> categories;
+    private int[] categoryOfQuery;
+    private long[] nanosPerCategory;
+    private long[] queriesPerCategory;
+    private boolean measured;
 
     @Setup(Level.Trial)
     public void openIndex() {
@@ -68,20 +71,43 @@ public class QueryTimeBenchmark {
         stopwords = QueryWorkload.stopwords();
         List<WorkloadQuery> workload = QueryWorkload.queries();
         queries = QueryWorkload.texts(workload, QueryWorkload.ALL_CATEGORIES);
-        measured = QueryWorkload.texts(workload, category);
-        Check.require(!measured.isEmpty(), "no query of category " + category + " in queries.txt");
+        categories = workload.stream().map(WorkloadQuery::category).distinct().toList();
+        categoryOfQuery = workload.stream().mapToInt(query -> categories.indexOf(query.category())).toArray();
         search = openAndAnswerEveryQuery();
-        if (QueryWorkload.ALL_CATEGORIES.equals(category)) {
-            for (int sample = 0; sample < INDEX_MEMORY_SAMPLES; sample++) {
-                recordIndexMemory();
-            }
+        for (int sample = 0; sample < INDEX_MEMORY_SAMPLES; sample++) {
+            recordIndexMemory();
         }
         requireReferenceResults(fixture);
     }
 
+    @Setup(Level.Iteration)
+    public void resetCategoryTimes(IterationParams iteration) {
+        nanosPerCategory = new long[categories.size()];
+        queriesPerCategory = new long[categories.size()];
+        measured = iteration.getType() == IterationType.MEASUREMENT;
+    }
+
+    /** A random query of any category, timed per category too, so one run measures every category (SPEC §11). */
     @Benchmark
     public SearchResult queryTime() {
-        return search.execute(measured.get(ThreadLocalRandom.current().nextInt(measured.size())));
+        int query = ThreadLocalRandom.current().nextInt(queries.size());
+        long start = System.nanoTime();
+        SearchResult result = search.execute(queries.get(query));
+        nanosPerCategory[categoryOfQuery[query]] += System.nanoTime() - start;
+        queriesPerCategory[categoryOfQuery[query]]++;
+        return result;
+    }
+
+    @TearDown(Level.Iteration)
+    public void recordCategoryTimes() {
+        if (!measured) {
+            return;
+        }
+        for (int category = 0; category < categories.size(); category++) {
+            double microsPerQuery = nanosPerCategory[category] / 1000.0 / queriesPerCategory[category];
+            ResultRow sample = ResultRow.sample(index, "query_time_" + categories.get(category), books, microsPerQuery, "µs/query");
+            FootprintLog.appendSample(BenchmarkRunner.SERVICE, sample);
+        }
     }
 
     private void recordIndexMemory() {

@@ -50,11 +50,8 @@ public class BenchmarkRunner {
                 .toList();
     }
 
+    // query_time_<category> comes from the benchmark itself through FootprintLog: one sample per measured second
     private static Stream<ResultRow> queryTimeRows(RunResult result) {
-        String category = result.getParams().getParam("category");
-        if (!QueryWorkload.ALL_CATEGORIES.equals(category)) {
-            return Stream.of(JmhResults.perIteration(result, "query_time_" + category, QUERY_TIME_UNIT, Result::getScore));
-        }
         return Stream.of(
                 JmhResults.perIteration(result, "query_time", QUERY_TIME_UNIT, Result::getScore),
                 JmhResults.perIteration(result, "query_time_p99", QUERY_TIME_UNIT, sampled -> sampled.getStatistics().getPercentile(99)));

@@ -18,16 +18,32 @@ public final class PrebuiltIndexes {
 
     private static final String PREFIX = "prebuilt-";
     private static final String BUILT_MARKER = ".built";
+    private static final String WORKING_MARKER = ".working";
 
     private PrebuiltIndexes() {
     }
 
     public static BenchmarkStore of(String index, int books, IndexFixture fixture) {
-        BenchmarkStore store = store(index, books);
-        Path marker = marker(index, books);
+        BenchmarkStore store = builtStore(index, books);
+        Path marker = marker(index, books, BUILT_MARKER);
         if (!Files.exists(marker)) {
             store.clear();
             fixture.index(store.invertedIndex(), fixture.dataset().ids(books));
+            create(marker);
+        }
+        return store;
+    }
+
+    /**
+     * A copy of a prebuilt index for benchmarks that update it, copied once per run and shared by every process
+     * and benchmark method, which put it back to the prebuilt index before each run (SPEC §11) instead of copying
+     * it whole: for folders that is hundreds of thousands of files.
+     */
+    public static BenchmarkStore workingCopyOf(BenchmarkStore prebuilt, String index, int books) {
+        BenchmarkStore store = workingStore(index, books);
+        Path marker = marker(index, books, WORKING_MARKER);
+        if (!Files.exists(marker)) {
+            prebuilt.copyTo(store);
             create(marker);
         }
         return store;
@@ -38,23 +54,32 @@ public final class PrebuiltIndexes {
     }
 
     public static void deleteAll() {
-        prebuiltEntries().filter(entry -> entry.getFileName().toString().endsWith(BUILT_MARKER))
-                .forEach(PrebuiltIndexes::deleteStoreOf);
+        prebuiltEntries().forEach(PrebuiltIndexes::deleteStoreOf);
         prebuiltEntries().forEach(Directories::delete);
     }
 
-    private static BenchmarkStore store(String index, int books) {
+    private static BenchmarkStore builtStore(String index, int books) {
         return BenchmarkStore.forIndex(index, PREFIX + "index-" + index + "-" + books);
     }
 
-    private static Path marker(String index, int books) {
-        return file(index + "-" + books + BUILT_MARKER);
+    private static BenchmarkStore workingStore(String index, int books) {
+        return BenchmarkStore.forIndex(index, PREFIX + "working-" + index + "-" + books);
     }
 
-    private static void deleteStoreOf(Path marker) {
-        String name = marker.getFileName().toString();
-        String[] indexAndBooks = name.substring(PREFIX.length(), name.length() - BUILT_MARKER.length()).split("-");
-        store(indexAndBooks[0], Integer.parseInt(indexAndBooks[1])).clear();
+    private static Path marker(String index, int books, String kind) {
+        return file(index + "-" + books + kind);
+    }
+
+    private static void deleteStoreOf(Path entry) {
+        String name = entry.getFileName().toString();
+        for (String kind : List.of(BUILT_MARKER, WORKING_MARKER)) {
+            if (name.endsWith(kind)) {
+                String[] indexAndBooks = name.substring(PREFIX.length(), name.length() - kind.length()).split("-");
+                String index = indexAndBooks[0];
+                int books = Integer.parseInt(indexAndBooks[1]);
+                (BUILT_MARKER.equals(kind) ? builtStore(index, books) : workingStore(index, books)).clear();
+            }
+        }
     }
 
     private static Stream<Path> prebuiltEntries() {
