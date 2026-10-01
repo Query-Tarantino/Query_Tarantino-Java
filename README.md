@@ -94,7 +94,7 @@ The following directories are **created at runtime** in the project root and are
 | `datalake/`   | crawler    | `<id>.header.txt` / `<id>.body.txt` in the selected layout           |
 | `datamarts/`  | indexer    | `inverted_index.json`, `inverted_index/`, `metadata.db`              |
 | `control/`    | control    | `downloaded_books.txt`, `indexed_books.txt`                          |
-| `benchmarks/` | benchmarks | `cache/` dataset, `results/` CSVs, `report/` comparison, raw JMH output |
+| `benchmarks/` | benchmarks | `cache/` dataset, `results/` CSVs, `report/` comparison, raw JMH output, `tmp.noindex/` scratch files |
 
 ## Requirements
 
@@ -241,7 +241,7 @@ mvn verify -Pbenchmark -DskipTests                       # every service
 mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
 ```
 
-A full run with 100, 500, 1 000 and 2 000 books takes **about 6 hours**: each benchmark runs in 3 processes
+A full run with 100, 500, 1 000 and 2 000 books takes **about 4 hours**: each benchmark runs in 3 processes
 (SPEC §11), and a run with a single process took about 3 hours, most of it building the `folders` and
 `mongo` indexes with 2 000 books. These variables shorten it:
 

@@ -208,8 +208,9 @@ set as the modification time of the body file.
 
 **Execution.**
 
-- Same machine for all languages, with nothing else running and `<benchmarks>` excluded from file
-  indexing (on macOS, an empty `<benchmarks>/.metadata_never_index` file).
+- Same machine for all languages, with nothing else running. The files that benchmarks write are kept
+  out of file indexing: on macOS, under `<benchmarks>/tmp.noindex/`, since Spotlight skips directories
+  whose name ends in `.noindex`.
 - Same MongoDB for all languages: **MongoDB 7.0 running natively** on the benchmark machine, with the
   WiredTiger cache fixed at 1 GB (`storage.wiredTiger.engineConfig.cacheSizeGB: 1`), using one database
   per benchmark. It must not run in a container: on macOS and Windows Docker runs a virtual machine that
@@ -221,7 +222,7 @@ set as the modification time of the body file.
 
 | Kind of metric                                                     | Warm-up per process | Measured per process | Samples |
 |--------------------------------------------------------------------|---------------------|----------------------|--------:|
-| One whole run: write, full build, incremental update, insertion    | 2 runs              | 3 runs               | 9       |
+| One whole run: write, full build, incremental update, insertion    | 1 run               | 3 runs               | 9       |
 | One operation: lookup, detection, query, metadata queries          | 3 × 1 second        | 5 × 1 second         | 15      |
 
   A sample of the first kind is the time of one run. A sample of the second kind is the mean time per

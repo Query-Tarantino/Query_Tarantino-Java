@@ -15,6 +15,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
+import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 2)
+@Warmup(iterations = 1)
 @Measurement(iterations = 3)
 @Fork(value = 3, jvmArgsAppend = {"-Xmx4g", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"})
 public class IncrementalUpdateBenchmark {
@@ -39,12 +40,10 @@ public class IncrementalUpdateBenchmark {
     private List<Integer> newIds;
 
     @Setup(Level.Trial)
-    public void buildSnapshot() {
+    public void selectSnapshot() {
         fixture = IndexFixture.fromEnvironment();
-        snapshot = BenchmarkStore.forIndex(index, "index-update-snapshot-" + index + "-" + books);
+        snapshot = PrebuiltIndexes.of(index, books, fixture);
         store = BenchmarkStore.forIndex(index, "index-update-" + index + "-" + books);
-        snapshot.clear();
-        fixture.index(snapshot.invertedIndex(), fixture.dataset().ids(books));
         newIds = fixture.dataset().newIds();
     }
 
@@ -59,8 +58,7 @@ public class IncrementalUpdateBenchmark {
     }
 
     @TearDown(Level.Trial)
-    public void deleteIndexes() {
+    public void deleteIndex() {
         store.clear();
-        snapshot.clear();
     }
 }

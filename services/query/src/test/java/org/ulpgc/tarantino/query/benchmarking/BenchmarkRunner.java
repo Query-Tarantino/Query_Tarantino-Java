@@ -7,6 +7,7 @@ import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkOpt
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.ResultsFile;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.JmhResults;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.Metric;
+import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
 
 import java.util.Collection;
 import java.util.Map;
@@ -20,7 +21,12 @@ public class BenchmarkRunner {
             "booksByAuthorTime", Metric.asMeasured("books_by_author_time", "µs/op"));
 
     public static void main(String[] args) throws RunnerException {
-        Collection<RunResult> results = new Runner(BenchmarkOptions.forService(SERVICE).build()).run();
-        System.out.println("Results written to " + ResultsFile.write(SERVICE, JmhResults.rows(results, METRICS)));
+        PrebuiltIndexes.deleteAll();
+        try {
+            Collection<RunResult> results = new Runner(BenchmarkOptions.forService(SERVICE).build()).run();
+            System.out.println("Results written to " + ResultsFile.write(SERVICE, JmhResults.rows(results, METRICS)));
+        } finally {
+            PrebuiltIndexes.deleteAll();
+        }
     }
 }

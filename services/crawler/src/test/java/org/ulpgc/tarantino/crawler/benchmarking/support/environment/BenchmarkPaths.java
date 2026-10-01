@@ -4,6 +4,9 @@ import java.nio.file.Path;
 
 public final class BenchmarkPaths {
 
+    // Spotlight skips directories whose name ends in .noindex, so it does not index the files benchmarks write
+    private static final String SCRATCH_DIRECTORY = "tmp.noindex";
+
     private BenchmarkPaths() {
     }
 
@@ -16,7 +19,11 @@ public final class BenchmarkPaths {
     }
 
     public static Path scratch(String name) {
-        return benchmarks().resolve("tmp").resolve(name);
+        return scratchRoot().resolve(name);
+    }
+
+    public static Path scratchRoot() {
+        return benchmarks().resolve(SCRATCH_DIRECTORY);
     }
 
     public static String mongoUri(String database) {

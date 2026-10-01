@@ -11,12 +11,12 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkPaths;
 import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
+import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
 import org.ulpgc.tarantino.query.QueryConfig;
 import org.ulpgc.tarantino.query.QueryFactory;
 import org.ulpgc.tarantino.query.adapters.stopwords.FileStopwordsLoader;
@@ -72,15 +72,12 @@ public class QueryTimeBenchmark {
 
     @Setup(Level.Trial)
     public void buildIndex() {
-        store = BenchmarkStore.forIndex(index, "query-index-" + index + "-" + books);
-        store.clear();
         IndexFixture fixture = IndexFixture.fromEnvironment();
-        List<Integer> ids = fixture.dataset().ids(books);
-        fixture.index(store.invertedIndex(), ids);
+        store = PrebuiltIndexes.of(index, books, fixture);
         stopwords = stopwords();
         search = new SearchCommand(QueryFactory.invertedIndex(config()), CONSTANT_METADATA, stopwords);
         queries = queries();
-        requireReferenceResults(fixture, ids);
+        requireReferenceResults(fixture);
     }
 
     @Benchmark
@@ -88,24 +85,29 @@ public class QueryTimeBenchmark {
         return search.execute(queries.get(ThreadLocalRandom.current().nextInt(queries.size())));
     }
 
-    @TearDown(Level.Trial)
-    public void deleteIndex() {
-        store.clear();
-    }
-
-    private void requireReferenceResults(IndexFixture fixture, List<Integer> ids) {
-        Map<String, List<Integer>> expected = referenceResults(fixture, ids);
+    private void requireReferenceResults(IndexFixture fixture) {
+        Map<String, List<Integer>> expected = referenceResults(fixture);
         queries.forEach(query -> Check.require(resultIds(query).equals(expected.get(query)), "wrong result for query '" + query + "'"));
     }
 
-    private Map<String, List<Integer>> referenceResults(IndexFixture fixture, List<Integer> ids) {
+    private Map<String, List<Integer>> referenceResults(IndexFixture fixture) {
+        Path cached = PrebuiltIndexes.file("reference-results-" + books + ".tsv");
+        if (Files.exists(cached)) {
+            return ReferenceResults.read(cached);
+        }
+        Map<String, List<Integer>> expected = computedReferenceResults(fixture);
+        ReferenceResults.write(cached, expected);
+        return expected;
+    }
+
+    private Map<String, List<Integer>> computedReferenceResults(IndexFixture fixture) {
         Map<String, Set<String>> termsOfQuery = new HashMap<>();
         Map<String, List<Integer>> expected = new HashMap<>();
         queries.forEach(query -> {
             termsOfQuery.put(query, QueryTerms.of(query, stopwords));
             expected.put(query, new ArrayList<>());
         });
-        for (int bookId : ids.stream().sorted().toList()) {
+        for (int bookId : fixture.dataset().ids(books).stream().sorted().toList()) {
             Set<String> bookTerms = fixture.terms(bookId);
             termsOfQuery.forEach((query, terms) -> {
                 if (!terms.isEmpty() && bookTerms.containsAll(terms)) {
