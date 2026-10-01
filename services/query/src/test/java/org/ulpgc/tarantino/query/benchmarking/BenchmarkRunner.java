@@ -1,5 +1,6 @@
 package org.ulpgc.tarantino.query.benchmarking;
 
+import org.openjdk.jmh.results.Result;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -19,8 +20,8 @@ import java.util.stream.Stream;
 public class BenchmarkRunner {
 
     public static final String SERVICE = "query";
+    private static final String QUERY_TIME_UNIT = "µs/query";
     private static final Map<String, Metric> METRICS = Map.of(
-            "queryTime", Metric.asMeasured("query_time", "µs/query"),
             "bookByIdTime", Metric.asMeasured("book_by_id_time", "µs/op"),
             "booksByAuthorTime", Metric.asMeasured("books_by_author_time", "µs/op"),
             "indexOpenTime", Metric.asMeasured("index_open_time", "ms"));
@@ -37,6 +38,25 @@ public class BenchmarkRunner {
     }
 
     private static List<ResultRow> rows(Collection<RunResult> results) {
-        return Stream.of(JmhResults.rows(results, METRICS), FootprintLog.drain(SERVICE)).flatMap(List::stream).toList();
+        return Stream.of(JmhResults.rows(results, METRICS), queryTimeRows(results), FootprintLog.drain(SERVICE))
+                .flatMap(List::stream)
+                .toList();
+    }
+
+    private static List<ResultRow> queryTimeRows(Collection<RunResult> results) {
+        return results.stream()
+                .filter(result -> JmhResults.method(result).equals("queryTime"))
+                .flatMap(BenchmarkRunner::queryTimeRows)
+                .toList();
+    }
+
+    private static Stream<ResultRow> queryTimeRows(RunResult result) {
+        String category = result.getParams().getParam("category");
+        if (!QueryWorkload.ALL_CATEGORIES.equals(category)) {
+            return Stream.of(JmhResults.perIteration(result, "query_time_" + category, QUERY_TIME_UNIT, Result::getScore));
+        }
+        return Stream.of(
+                JmhResults.perIteration(result, "query_time", QUERY_TIME_UNIT, Result::getScore),
+                JmhResults.perIteration(result, "query_time_p99", QUERY_TIME_UNIT, sampled -> sampled.getStatistics().getPercentile(99)));
     }
 }

@@ -13,6 +13,7 @@ import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -51,6 +52,13 @@ public final class IndexFixture {
 
     public List<Book> books(List<Integer> ids) {
         return ids.stream().map(this::bookText).map(headerParser::book).toList();
+    }
+
+    /** Distinct terms of the books, which every index structure must hold once they are indexed. */
+    public long vocabularySize(List<Integer> ids) {
+        Set<String> vocabulary = new HashSet<>();
+        ids.forEach(bookId -> vocabulary.addAll(terms(bookId)));
+        return vocabulary.size();
     }
 
     public Set<String> terms(int bookId) {

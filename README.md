@@ -32,8 +32,8 @@ it leaves behind, and number of files, directories and bytes (logical and in who
 | `mongo`   | MongoDB collection, one document per term         | Indexed random access and concurrency; needs a server       |
 
 Compared on full build time, incremental update time (book by book, as the control layer indexes, and in
-batch), index open time, query time, memory retained while building and while open, allocated memory, number
-of terms and disk usage (logical and in whole disk blocks).
+batch), index open time, query time (mean, 99th percentile and per kind of query), memory retained while
+building and while open, allocated memory, number of terms and disk usage (logical and in whole disk blocks).
 
 **3. Metadata: where title, author, language and path are stored** (PDF §4.1)
 
@@ -64,7 +64,7 @@ workload/     experiment definition shared by every language implementation
   book_ids.txt     candidate book ids for the benchmark dataset, in order
   sample_ids.txt   small sample dataset to test the pipeline quickly
   stopwords.txt    stopwords removed by the tokenizer
-  queries.txt      fixed query workload for the search benchmark
+  queries.txt      search benchmark workload: 5 queries per category (frequent, rare, mixed, long, empty, non-ASCII)
 ```
 
 Each service follows the same layout:
@@ -247,7 +247,7 @@ mvn verify -Pbenchmark -DskipTests                       # every service
 mvn verify -Pbenchmark -DskipTests -pl services/indexer  # a single service
 ```
 
-A full run with 100, 500, 1 000 and 2 000 books takes **about 5 hours**: each benchmark runs in 3 processes
+A full run with 100, 500, 1 000 and 2 000 books takes **about 6 hours**: each benchmark runs in 3 processes
 (SPEC §11), and a run with a single process took about 3 hours, most of it building the `folders` and
 `mongo` indexes with 2 000 books. These variables shorten it:
 
@@ -290,3 +290,22 @@ Like `scripts/fill_cache.sh`, it works from any directory: both resolve paths fr
 
 To compare languages as well, copy the `python-*.csv` and `csharp-*.csv` results of the other
 implementations, run on the same machine, into `benchmarks/results/` before running it.
+
+## Future improvements
+
+**Ranked search (Stage 2).** The inverted index stores only which books contain each term: the tokenizer
+counts term frequencies, but every structure discards them when it stores postings (SPEC §8.1). That is
+enough for boolean search, the AND queries this stage benchmarks, but not for ordering results by relevance
+(TF-IDF, BM25) as a real search engine does. Ranking would need:
+
+- **Index:** postings of book id and term frequency in the three structures (for example
+  `{"island": {"5": 3, "1342": 1}}` in `json`, `5 3` per line in `folders`, `{id, tf}` documents in `mongo`),
+  and re-indexing a book must replace its frequencies instead of adding them (no more `$addToSet`).
+- **Metadata:** the length of each book in terms, which BM25 normalizes by.
+- **Search:** results ordered by score instead of by id, usually matching any term (OR) instead of all of
+  them, which returns many more candidates.
+
+Expected costs: postings about 1.5 to 2 times larger, more memory for `json` (a map per term instead of a
+set), slower queries (scoring, above all for frequent terms) and somewhat slower updates; the real disk
+taken by `folders` barely changes, since one block per file already dominates it. It changes the SPEC for
+every language and every benchmark result, so it belongs to Stage 2, before its benchmarks are run.

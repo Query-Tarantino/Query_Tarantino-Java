@@ -35,7 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
@@ -51,27 +51,37 @@ public class QueryTimeBenchmark {
     @Param({"100", "500", "1000", "2000"})
     public int books;
 
+    // all: every query of queries.txt, also reported as the 99th percentile; the others, one category each
+    @Param({QueryWorkload.ALL_CATEGORIES, "frequent", "rare", "mixed", "long", "empty", "nonascii"})
+    public String category;
+
     private BenchmarkStore store;
     private SearchCommand search;
     private Set<String> stopwords;
     private List<String> queries;
+    private List<String> measured;
 
     @Setup(Level.Trial)
     public void openIndex() {
         IndexFixture fixture = IndexFixture.fromEnvironment();
         store = PrebuiltIndexes.of(index, books, fixture);
         stopwords = QueryWorkload.stopwords();
-        queries = QueryWorkload.queries();
+        List<WorkloadQuery> workload = QueryWorkload.queries();
+        queries = QueryWorkload.texts(workload, QueryWorkload.ALL_CATEGORIES);
+        measured = QueryWorkload.texts(workload, category);
+        Check.require(!measured.isEmpty(), "no query of category " + category + " in queries.txt");
         search = openAndAnswerEveryQuery();
-        for (int sample = 0; sample < INDEX_MEMORY_SAMPLES; sample++) {
-            recordIndexMemory();
+        if (QueryWorkload.ALL_CATEGORIES.equals(category)) {
+            for (int sample = 0; sample < INDEX_MEMORY_SAMPLES; sample++) {
+                recordIndexMemory();
+            }
         }
         requireReferenceResults(fixture);
     }
 
     @Benchmark
     public SearchResult queryTime() {
-        return search.execute(queries.get(ThreadLocalRandom.current().nextInt(queries.size())));
+        return search.execute(measured.get(ThreadLocalRandom.current().nextInt(measured.size())));
     }
 
     private void recordIndexMemory() {

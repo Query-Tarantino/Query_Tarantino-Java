@@ -18,13 +18,19 @@ import org.openjdk.jmh.runner.IterationType;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.Heap;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
+import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
 import org.ulpgc.tarantino.indexer.benchmarking.BenchmarkRunner;
 import org.ulpgc.tarantino.indexer.benchmarking.support.BenchmarkStore;
 import org.ulpgc.tarantino.indexer.benchmarking.support.IndexFixture;
+import org.ulpgc.tarantino.indexer.benchmarking.support.PrebuiltIndexes;
 import org.ulpgc.tarantino.indexer.benchmarking.support.StoreFootprint;
 import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.Reference;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +51,7 @@ public class FullIndexBuildBenchmark {
     private IndexFixture fixture;
     private BenchmarkStore store;
     private List<Integer> ids;
+    private long referenceTermCount;
     private boolean measured;
     private long allocated;
 
@@ -53,6 +60,7 @@ public class FullIndexBuildBenchmark {
         fixture = IndexFixture.fromEnvironment();
         store = BenchmarkStore.forIndex(index, "index-build-" + index + "-" + books);
         ids = fixture.dataset().ids(books);
+        referenceTermCount = referenceTermCount();
     }
 
     @Setup(Level.Iteration)
@@ -79,6 +87,8 @@ public class FullIndexBuildBenchmark {
     @TearDown(Level.Trial)
     public void recordFootprint() {
         StoreFootprint footprint = store.footprint();
+        Check.require(footprint.terms() == referenceTermCount,
+                index + " holds " + footprint.terms() + " terms instead of the " + referenceTermCount + " of the books");
         FootprintLog.append(BenchmarkRunner.SERVICE, List.of(
                 ResultRow.exact(index, "disk_usage", books, footprint.bytes(), "bytes"),
                 ResultRow.exact(index, "disk_allocated", books, footprint.allocatedBytes(), "bytes"),
@@ -86,6 +96,21 @@ public class FullIndexBuildBenchmark {
         store.clear();
         FootprintLog.appendSample(BenchmarkRunner.SERVICE, ResultRow.sample(index, "build_memory", books, buildMemory(), "bytes"));
         store.clear();
+    }
+
+    private long referenceTermCount() {
+        Path cached = PrebuiltIndexes.file("term-count-" + books + ".txt");
+        try {
+            if (Files.exists(cached)) {
+                return Long.parseLong(Files.readString(cached).strip());
+            }
+            long termCount = fixture.vocabularySize(ids);
+            Files.createDirectories(cached.getParent());
+            Files.writeString(cached, String.valueOf(termCount));
+            return termCount;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private long buildMemory() {

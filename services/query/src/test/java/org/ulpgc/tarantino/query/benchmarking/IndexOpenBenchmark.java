@@ -42,7 +42,7 @@ public class IndexOpenBenchmark {
     public void selectIndex() {
         store = PrebuiltIndexes.of(index, books, IndexFixture.fromEnvironment());
         stopwords = QueryWorkload.stopwords();
-        firstQuery = QueryWorkload.queries().getFirst();
+        firstQuery = QueryWorkload.queries().getFirst().text();
     }
 
     @Benchmark

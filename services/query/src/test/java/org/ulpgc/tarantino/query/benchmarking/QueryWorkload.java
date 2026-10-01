@@ -19,6 +19,8 @@ import java.util.Set;
 
 final class QueryWorkload {
 
+    static final String ALL_CATEGORIES = "all";
+
     // Metadata is not read by the index benchmarks, so only the index is measured
     private static final MetadataReader CONSTANT_METADATA = new MetadataReader() {
         @Override
@@ -44,13 +46,21 @@ final class QueryWorkload {
         return new FileStopwordsLoader(BenchmarkPaths.workload().resolve("stopwords.txt")).stopwords();
     }
 
-    static List<String> queries() {
+    static List<WorkloadQuery> queries() {
         try {
             return Files.readAllLines(BenchmarkPaths.workload().resolve("queries.txt")).stream()
                     .filter(line -> !line.isBlank())
+                    .map(WorkloadQuery::parse)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    static List<String> texts(List<WorkloadQuery> queries, String category) {
+        return queries.stream()
+                .filter(query -> ALL_CATEGORIES.equals(category) || query.category().equals(category))
+                .map(WorkloadQuery::text)
+                .toList();
     }
 }

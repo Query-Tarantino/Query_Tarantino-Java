@@ -45,7 +45,7 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
 | `book_ids.txt`   | Candidate ids for the benchmark cache, in order (1 to 4000).         |
 | `sample_ids.txt` | Small sample dataset; default candidates of the control service.     |
 | `stopwords.txt`  | Stopwords; each entry is stripped and lowercased (see §7) on load.   |
-| `queries.txt`    | One query per line for the search benchmark.                         |
+| `queries.txt`    | Search benchmark workload, one `<category>: <query>` per line (§11). |
 
 ## 4. Download
 
@@ -270,6 +270,8 @@ and the benchmark run fails without writing results otherwise:
 - New books detection: exactly the ids of the 100 new books.
 - Query: for every query of `queries.txt`, the same ids as a reference computed in memory from the
   tokenized books of the dataset (§7, §10).
+- Full index build: after the last build, every structure holds exactly as many terms as the distinct
+  terms of the tokenized books of the dataset (`term_count`).
 - Metadata queries: every id returns the book with that id, and every author returns at least every
   book of the dataset with exactly that author.
 
@@ -297,6 +299,8 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 |          |                              | `batch_update_time`        | ms/book |
 |          |                              | `index_open_time`          | ms      |
 |          |                              | `query_time`               | µs/query|
+|          |                              | `query_time_p99`           | µs/query|
+|          |                              | `query_time_<category>`    | µs/query|
 |          |                              | `build_memory`             | bytes   |
 |          |                              | `index_memory`             | bytes   |
 |          |                              | `memory_allocated`         | bytes   |
@@ -346,7 +350,23 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
   The operating system cache and an open MongoDB connection may be reused, so it measures loading the
   index, not starting a process.
 - `query_time`: time of a random query of `queries.txt` against an open index of N books; metadata is
-  not read, so only the index is measured.
+  not read, so only the index is measured. Every query is timed; a sample is the mean of one measured
+  second.
+- `query_time_p99`: the 99th percentile of the query times of each measured second, over the queries
+  of `query_time`; its samples are those 15 percentiles. A search engine is judged by its slowest
+  queries as much as by its mean.
+- `query_time_<category>`: `query_time` restricted to the queries of one category of `queries.txt`.
+  The cost of a query depends mostly on how long the postings it reads and intersects are, and terms
+  follow a Zipf distribution, so the workload has 5 queries of each category:
+
+  | Category   | Queries                                                | Postings read            |
+  |------------|--------------------------------------------------------|--------------------------|
+  | `frequent` | one term in nearly every book (`love`, `time`)         | one very long list       |
+  | `rare`     | one term in 2 or 3 of the first 2000 books, all within the first 100 | one tiny list |
+  | `mixed`    | a frequent term and a rare one                         | long list ∩ tiny list    |
+  | `long`     | four common terms (`ship captain sea voyage`)          | four long lists          |
+  | `empty`    | two rare terms that no book has together               | two tiny lists, no result |
+  | `nonascii` | one term with non-ASCII letters (`cæsar`, `façade`)    | encoded file names in `folders` |
 - `index_memory`: memory retained by an index of N books open for querying, i.e. heap in use after a
   full garbage collection with the index open and every query of `queries.txt` answered once, minus the
   same measure before opening it. Each process opens the index once without measuring it and then
