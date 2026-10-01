@@ -19,6 +19,7 @@ public final class BenchmarkStore {
 
     private static final String MONGO = "mongo";
     private static final String FOLDERS = "folders";
+    private static final String INVERTED_INDEX = "inverted_index";
 
     private final IndexerConfig config;
     private final boolean mongo;
@@ -68,14 +69,14 @@ public final class BenchmarkStore {
     }
 
     /**
-     * Restores the snapshot after an update that only touched the given terms. For folders only their files
-     * are put back, instead of copying hundreds of thousands of files; the other structures are copied whole.
+     * Restores the snapshot after an update that only touched the given terms. For folders and MongoDB only their
+     * files or documents are put back, instead of hundreds of thousands of them; json, a single file, is copied.
      */
     public void restoreTermsFrom(BenchmarkStore snapshot, Set<String> touchedTerms) {
-        if (FOLDERS.equals(config.index())) {
-            TermFileRestore.restore(snapshot.folderIndex(), folderIndex(), touchedTerms);
-        } else {
-            snapshot.copyTo(this);
+        switch (config.index()) {
+            case FOLDERS -> TermFileRestore.restore(snapshot.folderIndex(), folderIndex(), touchedTerms);
+            case MONGO -> MongoStores.restoreDocuments(snapshot.config.mongoUri(), config.mongoUri(), INVERTED_INDEX, "term", touchedTerms);
+            default -> snapshot.copyTo(this);
         }
     }
 
@@ -86,7 +87,7 @@ public final class BenchmarkStore {
     public StoreFootprint footprint() {
         if (mongo) {
             long bytes = MongoStores.diskUsage(config.mongoUri());
-            return new StoreFootprint(bytes, bytes, MongoStores.documentCount(config.mongoUri(), "inverted_index"));
+            return new StoreFootprint(bytes, bytes, MongoStores.documentCount(config.mongoUri(), INVERTED_INDEX));
         }
         if (FOLDERS.equals(config.index())) {
             Footprint folders = Directories.footprint(folderIndex());

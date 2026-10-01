@@ -1,7 +1,6 @@
 package org.ulpgc.tarantino.indexer.benchmarking;
 
 import org.openjdk.jmh.results.RunResult;
-import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.ulpgc.tarantino.crawler.benchmarking.support.environment.BenchmarkOptions;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.FootprintLog;
@@ -31,7 +30,7 @@ public class BenchmarkRunner {
         FootprintLog.drain(SERVICE);
         PrebuiltIndexes.deleteAll();
         try {
-            Collection<RunResult> results = new Runner(BenchmarkOptions.forService(SERVICE).build()).run();
+            Collection<RunResult> results = JmhResults.run(BenchmarkOptions.passes(SERVICE));
             System.out.println("Results written to " + ResultsFile.write(SERVICE, rows(results)));
         } finally {
             PrebuiltIndexes.deleteAll();

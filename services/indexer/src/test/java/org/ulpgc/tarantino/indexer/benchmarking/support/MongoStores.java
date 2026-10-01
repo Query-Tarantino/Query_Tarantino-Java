@@ -5,9 +5,14 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.InsertManyOptions;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
@@ -33,6 +38,21 @@ final class MongoStores {
             MongoDatabase source = database(client, sourceUri);
             MongoDatabase target = database(client, targetUri);
             source.listCollectionNames().forEach(collection -> copyCollection(source.getCollection(collection), target));
+        }
+    }
+
+    /** Puts back the documents of some values of a unique field as the snapshot has them, deleting the others. */
+    static void restoreDocuments(String snapshotUri, String targetUri, String collection, String field,
+                                 Collection<String> values) {
+        try (MongoClient client = MongoClients.create(snapshotUri)) {
+            Bson documentsOfValues = Filters.in(field, values);
+            MongoCollection<Document> target = database(client, targetUri).getCollection(collection);
+            target.deleteMany(documentsOfValues);
+            List<Document> stored = database(client, snapshotUri).getCollection(collection).find(documentsOfValues)
+                    .into(new ArrayList<>());
+            if (!stored.isEmpty()) {
+                target.insertMany(stored, new InsertManyOptions().ordered(false));
+            }
         }
     }
 

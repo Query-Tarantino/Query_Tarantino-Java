@@ -1,11 +1,21 @@
 package org.ulpgc.tarantino.crawler.benchmarking.support.results;
 
 import org.openjdk.jmh.infra.BenchmarkParams;
+import org.openjdk.jmh.results.BenchmarkResult;
 import org.openjdk.jmh.results.Result;
 import org.openjdk.jmh.results.RunResult;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.util.ListStatistics;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -17,6 +27,21 @@ public final class JmhResults {
     private static final List<String> STRUCTURE_PARAMS = List.of("layout", "index", "metadata");
 
     private JmhResults() {
+    }
+
+    /**
+     * Runs the passes one after the other and gives each benchmark configuration the processes of every pass,
+     * as a single run forking that many processes would (SPEC §11).
+     */
+    public static Collection<RunResult> run(List<Options> passes) throws RunnerException {
+        Map<String, RunResult> results = new LinkedHashMap<>();
+        for (Options pass : passes) {
+            if (pass.getResult().hasValue()) {
+                createParentDirectories(pass.getResult().get());
+            }
+            new Runner(pass).run().forEach(result -> results.merge(result.getParams().id(), result, JmhResults::combined));
+        }
+        return results.values();
     }
 
     public static List<ResultRow> rows(Collection<RunResult> results, Map<String, Metric> metrics) {
@@ -38,6 +63,20 @@ public final class JmhResults {
 
     public static String method(RunResult result) {
         return method(result.getParams());
+    }
+
+    private static void createParentDirectories(String file) {
+        try {
+            Files.createDirectories(Path.of(file).toAbsolutePath().getParent());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static RunResult combined(RunResult first, RunResult second) {
+        List<BenchmarkResult> processes = new ArrayList<>(first.getBenchmarkResults());
+        processes.addAll(second.getBenchmarkResults());
+        return new RunResult(first.getParams(), processes);
     }
 
     private static Optional<ResultRow> mappedRow(RunResult result, Map<String, Metric> metrics) {

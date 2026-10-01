@@ -7,7 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -17,12 +17,18 @@ public final class Directories {
     private Directories() {
     }
 
+    /** Deletes the files in parallel, as a folders index holds hundreds of thousands, and then the directories. */
     public static void delete(Path root) {
-        entries(root).stream().sorted(Comparator.reverseOrder()).forEach(Directories::deleteEntry);
+        Tree tree = Tree.of(root);
+        tree.files().parallelStream().forEach(Directories::deleteEntry);
+        tree.directories().reversed().forEach(Directories::deleteEntry);
     }
 
+    /** Creates the directories and then copies the files in parallel. */
     public static void copy(Path source, Path target) {
-        entries(source).forEach(entry -> copyEntry(entry, target.resolve(source.relativize(entry))));
+        Tree tree = Tree.of(source);
+        tree.directories().forEach(directory -> createDirectories(target.resolve(source.relativize(directory))));
+        tree.files().parallelStream().forEach(file -> copyFile(file, target.resolve(source.relativize(file))));
     }
 
     public static long fileCount(Path root) {
@@ -59,13 +65,17 @@ public final class Directories {
         }
     }
 
-    private static void copyEntry(Path entry, Path target) {
+    private static void createDirectories(Path directory) {
         try {
-            if (Files.isDirectory(entry)) {
-                Files.createDirectories(target);
-            } else {
-                Files.copy(entry, target);
-            }
+            Files.createDirectories(directory);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void copyFile(Path file, Path target) {
+        try {
+            Files.copy(file, target);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -76,6 +86,35 @@ public final class Directories {
             Files.delete(entry);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The directories of a tree, each before its contents, and its other entries, listed in one walk. */
+    private record Tree(List<Path> directories, List<Path> files) {
+
+        private static Tree of(Path root) {
+            Tree tree = new Tree(new ArrayList<>(), new ArrayList<>());
+            if (!Files.exists(root)) {
+                return tree;
+            }
+            try {
+                Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                        tree.directories().add(directory);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                        tree.files().add(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+                return tree;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

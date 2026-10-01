@@ -153,6 +153,10 @@ the structure has an order.
 - `json` is rewritten completely, and atomically (`.tmp` + rename), each time the index is flushed.
 - `folders` rewrites, on each flush, every affected term file with the union of its stored ids and the
   new ones, sorted and atomically (`.tmp` + rename). Term files that gain no new id are not touched.
+- `folders` and `mongo` write the affected terms of a flush in ascending ordinal string order (UTF-16
+  code units in Java and C#, code points in Python; they differ only for supplementary characters), so
+  the files of each `<c>` directory are written together and MongoDB's `term` index receives its keys
+  in order. The order is not observable in the result, but it changes the cost of a flush.
 - `folders` file names: in the UTF-8 bytes of the term, ASCII `a`–`z` are kept and every other byte is
   written as `%` and two uppercase hexadecimal digits (`island` → `island`, `écume` → `%C3%A9cume`). If
   the result is longer than 200 characters, the name is `#` followed by the lowercase hexadecimal SHA-256
@@ -268,8 +272,12 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
   Windows), Docker runs containers inside a virtual machine that reserves its own memory and adds a
   network round trip to every operation, so MongoDB must be installed natively there.
 - Record CPU, RAM, OS, runtime versions and the MongoDB version.
-- Each benchmark runs in **2 separate processes**. Each process runs warm-up iterations, which are
-  discarded, and then measured iterations. Every measured iteration is one **sample**:
+- Each benchmark runs in **2 separate processes** for every structure and size, one in each of two
+  passes over all the benchmarks of a service. The second pass takes the structures and the sizes in
+  reverse order, so whatever drifts during a run, such as the temperature of the machine or the writes
+  left by the benchmark before, weighs alike on every structure instead of always on the last ones.
+  Each process runs warm-up iterations, which are discarded, and then measured iterations. Every
+  measured iteration is one **sample**:
 
 | Kind of metric                                            | Warm-up per process                                 | Measured per process | Samples |
 |-----------------------------------------------------------|-----------------------------------------------------|----------------------|--------:|
@@ -283,8 +291,9 @@ benchmarks leave it unchanged, so writing costs the same for every layout.
   A sample of the first kind is the time of one run. A sample of the second kind is the mean time per
   operation during one second.
 - Before every run of the first kind, warm-up included, storage is reset without timing it: emptied,
-  except for the incremental and batch updates, where the index is restored to exactly the dataset of
-  size N, and index open, which only reads.
+  except for index open, which only reads, and the incremental and batch updates, which start every run
+  from exactly the index of the dataset of size N. Putting back right before each run only the terms of
+  the new books is enough, and costs a fraction of copying the whole index.
 - The **value** of a metric is the mean of its samples. Its **error** is the half-width of the 95%
   confidence interval of that mean, t₀.₉₇₅,ₙ₋₁ · s / √n over the n samples, computed from the samples
   (JMH's own `Score Error` is fixed at 99.9%). Two structures are **tied** when their intervals overlap:

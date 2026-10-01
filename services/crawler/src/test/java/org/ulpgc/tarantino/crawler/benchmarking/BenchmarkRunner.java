@@ -1,7 +1,6 @@
 package org.ulpgc.tarantino.crawler.benchmarking;
 
 import org.openjdk.jmh.results.RunResult;
-import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.DatalakeFixture;
 import org.ulpgc.tarantino.crawler.benchmarking.support.datalake.RecoveryOutcome;
@@ -34,7 +33,7 @@ public class BenchmarkRunner {
 
     public static void main(String[] args) throws RunnerException {
         FootprintLog.drain(SERVICE);
-        Collection<RunResult> results = new Runner(BenchmarkOptions.forService(SERVICE).build()).run();
+        Collection<RunResult> results = JmhResults.run(BenchmarkOptions.passes(SERVICE));
         System.out.println("Results written to " + ResultsFile.write(SERVICE, rows(results)));
     }
 

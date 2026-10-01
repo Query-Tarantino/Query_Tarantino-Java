@@ -74,8 +74,10 @@ public class IncrementalUpdateBenchmark {
     }
 
     /**
-     * Opens the index before timing, as a running control layer has it open: otherwise json's loading would be
-     * spread over 10 books in one method and over 100 in the other. Loading is measured by index_open_time.
+     * Puts back the terms of the new books right before every run, so each one starts from the prebuilt index
+     * just written (SPEC §11), and opens the index before timing, as a running control layer has it open:
+     * otherwise json's loading would be spread over 10 books in one method and over 100 in the other. Loading is
+     * measured by index_open_time.
      */
     @Setup(Level.Iteration)
     public void restoreAndOpenIndex() {

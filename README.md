@@ -293,10 +293,10 @@ surface gives steadier results. The scratch files go under `benchmarks/tmp.noind
 on macOS; on a Linux desktop with KDE Baloo, which indexes the whole home directory, exclude `benchmarks/` in
 its settings.
 
-A full run with 100, 300 and 1 000 books takes **about 1 hour 30 minutes** on an Apple M4 laptop with an SSD
-(estimated from per-run times and the speed of the disk, checked against a quick run; it depends mostly on
-the disk): every benchmark runs in 2 processes (SPEC §11), and most of the time goes to building and updating
-the `folders` index, one file per term. These variables shorten it:
+A full run with 100, 300 and 1 000 books takes **about 1 hour 10 minutes** on an Apple M4 laptop with an SSD:
+13 minutes for 100 books alone (measured), the larger sizes estimated from how each step grows with N, so it
+depends mostly on the disk. Every benchmark runs in 2 processes (SPEC §11), and two thirds of the time go to
+building and updating the `folders` index, one file per term. These variables shorten it:
 
 | Variable                         | Effect                                                        |
 |----------------------------------|---------------------------------------------------------------|
@@ -311,7 +311,8 @@ TARANTINO_BENCHMARK_QUICK=true TARANTINO_BENCHMARK_BOOKS=20 mvn verify -Pbenchma
 ### Results
 
 `benchmarks/results/java-<service>.csv` holds the results shared with the other languages, in the format
-of [SPEC.md](SPEC.md#11-benchmarks); `benchmarks/<service>/jmh-results.csv` keeps the raw JMH output.
+of [SPEC.md](SPEC.md#11-benchmarks); `benchmarks/<service>/jmh-results-pass-<1|2>.csv` keep the raw JMH output of
+each pass.
 
 | Comparison               | Structures                 | Metrics                                                                  | Benchmarks                                                          |
 |--------------------------|----------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------|

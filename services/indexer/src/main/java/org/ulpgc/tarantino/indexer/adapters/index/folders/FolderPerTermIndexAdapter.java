@@ -9,6 +9,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -28,15 +29,19 @@ public class FolderPerTermIndexAdapter implements InvertedIndexStorage {
         pending.add(occurrences);
     }
 
+    /** Terms come in order, so the files of each folder are written together; each folder is created once. */
     @Override
     public void flush() {
-        pending.drain().forEach(this::merge);
+        Set<Path> folders = new HashSet<>();
+        pending.drain().forEach((term, ids) -> merge(TermFiles.file(root, term), ids, folders));
     }
 
-    private void merge(String term, Set<Integer> ids) {
-        Path file = TermFiles.file(root, term);
+    private static void merge(Path file, Set<Integer> ids, Set<Path> folders) {
         TreeSet<Integer> postings = storedPostings(file);
         if (postings.addAll(ids)) {
+            if (folders.add(file.getParent())) {
+                createDirectories(file.getParent());
+            }
             writeAtomically(file, postings);
         }
     }
@@ -53,10 +58,17 @@ public class FolderPerTermIndexAdapter implements InvertedIndexStorage {
         }
     }
 
+    private static void createDirectories(Path folder) {
+        try {
+            Files.createDirectories(folder);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static void writeAtomically(Path file, TreeSet<Integer> postings) {
         try {
             Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.createDirectories(file.getParent());
             Files.writeString(temporary, content(postings));
             Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
