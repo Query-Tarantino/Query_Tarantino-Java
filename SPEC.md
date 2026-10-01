@@ -170,7 +170,9 @@ book as indexed right after.
 
 **State files** in `TARANTINO_CONTROL`: `downloaded_books.txt` and `indexed_books.txt`, one id per line.
 They are append-only. On read, lines that are not a whole number after stripping are ignored,
-so a partially written last line is harmless. File order is preserved.
+so a partially written last line is harmless. File order is preserved. They are read once when a run
+starts; during the run the control layer keeps the state in memory and only appends to the files, so a
+step costs the same however many books are already done.
 
 **Ingestion** of a book is idempotent: if the datalake already contains it (§6), it succeeds with the
 existing paths without downloading again.
