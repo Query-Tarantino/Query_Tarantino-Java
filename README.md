@@ -86,9 +86,10 @@ src/test/java/org/ulpgc/tarantino/<service>/
   benchmarking/   JMH benchmarks by comparison, and support/ code shared through the test-jars
 ```
 
-No package holds more than three classes. Helpers used by a single structure stay package-private
-inside its package (e.g. `index/folders/TermFiles`); only helpers shared by several structures are public
-(e.g. `datalake/BookFiles`, `index/PendingPostings`).
+Packages are kept small, about three classes each. This is a guideline, not an exact limit: a few benchmark
+packages hold some more, since splitting them would separate classes that only work together. Helpers used by
+a single structure stay package-private inside its package (e.g. `index/folders/TermFiles`); only helpers
+shared by several structures are public (e.g. `datalake/BookFiles`, `index/PendingPostings`).
 
 The following directories are **created at runtime** in the project root and are not versioned:
 
