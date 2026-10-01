@@ -290,7 +290,9 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 |          |                              | `book_by_id_time`          | µs/op   |
 |          |                              | `books_by_author_time`     | µs/op   |
 
-- `write_throughput`: N divided by the time to read, split (§5) and store the N cached books.
+- `write_throughput`: N divided by the time to ingest the N cached books as the crawler does (§9,
+  ingestion): look the book up in the datalake (§6, lookup), then read, split (§5) and store it. The
+  lookup is part of real ingestion, and for `time` it searches the whole datalake.
 - `lookup_time`: time to find the header and body of a random book of the dataset.
 - `new_books_detection_time`: time to list the 100 new books (§6, new books detection). The N books of
   the dataset are saved first, ending one day before the new ones, which are then saved at the current time.

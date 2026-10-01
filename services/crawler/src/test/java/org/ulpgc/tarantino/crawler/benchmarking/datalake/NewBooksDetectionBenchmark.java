@@ -62,7 +62,7 @@ public class NewBooksDetectionBenchmark {
         storeOldBooks(dataset.ids(books), dataset);
         datalake = DatalakeFixture.datalake(layout, root);
         List<Integer> newIds = dataset.newIds();
-        DatalakeFixture.store(datalake, newIds, dataset);
+        DatalakeFixture.ingest(datalake, newIds, dataset);
         Check.require(datalake.idsStoredSince(lastRun).equals(Set.copyOf(newIds)), "detection did not list exactly the new books");
     }
 
@@ -78,7 +78,7 @@ public class NewBooksDetectionBenchmark {
 
     private void storeOldBooks(List<Integer> ids, BenchmarkDataset dataset) {
         Instant crawlStart = lastRun.minus(AGE_OF_OLD_BOOKS).minus(CrawlClock.durationOf(ids.size()));
-        List<StoredPaths> stored = DatalakeFixture.storeAsCrawled(layout, root, ids, dataset, crawlStart);
+        List<StoredPaths> stored = DatalakeFixture.ingestAsCrawled(layout, root, ids, dataset, crawlStart);
         for (int position = 0; position < stored.size(); position++) {
             age(stored.get(position), CrawlClock.instantOf(crawlStart, position));
         }

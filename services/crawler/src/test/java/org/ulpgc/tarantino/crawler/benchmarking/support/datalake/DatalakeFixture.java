@@ -6,14 +6,16 @@ import org.ulpgc.tarantino.crawler.adapters.datalake.time.TimeBasedDatalakeAdapt
 import org.ulpgc.tarantino.crawler.benchmarking.support.dataset.BenchmarkDataset;
 import org.ulpgc.tarantino.crawler.benchmarking.support.files.Directories;
 import org.ulpgc.tarantino.crawler.benchmarking.support.results.ResultRow;
-import org.ulpgc.tarantino.crawler.model.book.GutenbergText;
+import org.ulpgc.tarantino.crawler.benchmarking.support.validation.Check;
+import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
+import org.ulpgc.tarantino.crawler.commands.IngestResult;
 import org.ulpgc.tarantino.crawler.model.book.StoredPaths;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.time.Clock;
 import java.util.List;
 
 public final class DatalakeFixture {
@@ -32,23 +34,26 @@ public final class DatalakeFixture {
         return "time".equals(layout) ? new TimeBasedDatalakeAdapter(root, clock) : CrawlerFactory.datalake(new CrawlerConfig(root, layout));
     }
 
-    public static List<StoredPaths> store(DatalakeStorage datalake, List<Integer> ids, BenchmarkDataset dataset) {
-        return ids.stream().map(id -> save(datalake, id, dataset)).toList();
+    /** Ingests the books as the crawler does: skipping stored ones, then reading, splitting and saving (SPEC §9). */
+    public static List<StoredPaths> ingest(DatalakeStorage datalake, List<Integer> ids, BenchmarkDataset dataset) {
+        IngestBookCommand ingest = new IngestBookCommand(dataset::rawText, datalake);
+        return ids.stream().map(id -> stored(ingest.execute(id))).toList();
     }
 
-    public static List<StoredPaths> storeAsCrawled(String layout, Path root, List<Integer> ids, BenchmarkDataset dataset, Instant start) {
+    public static List<StoredPaths> ingestAsCrawled(String layout, Path root, List<Integer> ids, BenchmarkDataset dataset, Instant start) {
         CrawlClock clock = new CrawlClock(start);
-        DatalakeStorage datalake = datalake(layout, root, clock);
+        IngestBookCommand ingest = new IngestBookCommand(dataset::rawText, datalake(layout, root, clock));
         List<StoredPaths> stored = new ArrayList<>(ids.size());
         for (int position = 0; position < ids.size(); position++) {
             clock.moveTo(position);
-            stored.add(save(datalake, ids.get(position), dataset));
+            stored.add(stored(ingest.execute(ids.get(position))));
         }
         return stored;
     }
 
-    private static StoredPaths save(DatalakeStorage datalake, int bookId, BenchmarkDataset dataset) {
-        return datalake.save(GutenbergText.bookText(bookId, dataset.rawText(bookId)));
+    private static StoredPaths stored(IngestResult result) {
+        Check.require(result.succeeded(), "book " + result.bookId() + " not ingested: " + result.failure());
+        return result.paths();
     }
 
     public static List<ResultRow> footprint(String layout, int books, Path root) {
