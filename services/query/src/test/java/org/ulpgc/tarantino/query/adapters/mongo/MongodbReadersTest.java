@@ -1,15 +1,11 @@
 package org.ulpgc.tarantino.query.adapters.mongo;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mongodb.MongoDBContainer;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.ulpgc.tarantino.indexer.adapters.mongo.TemporaryMongoDatabase;
 import org.ulpgc.tarantino.query.adapters.index.mongo.MongodbIndexReader;
 import org.ulpgc.tarantino.query.adapters.metadata.MongodbMetadataReader;
 import org.ulpgc.tarantino.query.model.BookMetadata;
@@ -21,11 +17,10 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Testcontainers(disabledWithoutDocker = true)
 class MongodbReadersTest {
 
-    @Container
-    private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:7.0");
+    @RegisterExtension
+    static final TemporaryMongoDatabase MONGO = new TemporaryMongoDatabase();
 
     @BeforeEach
     void insertDocuments() {
@@ -36,16 +31,9 @@ class MongodbReadersTest {
                 book(84, "Frankenstein", null)));
     }
 
-    @AfterEach
-    void dropDatabase() {
-        try (MongoClient client = MongoClients.create(MONGO.getConnectionString())) {
-            client.getDatabase("tarantino").drop();
-        }
-    }
-
     @Test
     void readsPostingsOfATermAndNothingForUnknownTerms() {
-        MongodbIndexReader index = new MongodbIndexReader(MONGO.getConnectionString());
+        MongodbIndexReader index = new MongodbIndexReader(MONGO.uri());
 
         assertEquals(Set.of(5, 1342), index.postings("island"));
         assertEquals(Set.of(), index.postings("whale"));
@@ -54,12 +42,12 @@ class MongodbReadersTest {
     @Test
     void findsABookByIdKeepingMissingFieldsAsNull() {
         assertEquals(Optional.of(new BookMetadata(84, "Frankenstein", null, "English", Path.of("datalake/84/body.txt"))),
-                new MongodbMetadataReader(MONGO.getConnectionString()).book(84));
+                new MongodbMetadataReader(MONGO.uri()).book(84));
     }
 
     @Test
     void findsBooksByCaseInsensitiveAuthorSubstringOrderedById() {
-        List<Integer> ids = new MongodbMetadataReader(MONGO.getConnectionString()).booksBy("twain").stream()
+        List<Integer> ids = new MongodbMetadataReader(MONGO.uri()).booksBy("twain").stream()
                 .map(BookMetadata::bookId)
                 .toList();
 
@@ -72,6 +60,6 @@ class MongodbReadersTest {
     }
 
     private static MongoDatabase database() {
-        return MongoDatabases.database(MONGO.getConnectionString());
+        return MongoDatabases.database(MONGO.uri());
     }
 }

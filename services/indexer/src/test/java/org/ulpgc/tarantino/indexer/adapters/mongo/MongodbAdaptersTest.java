@@ -1,15 +1,10 @@
 package org.ulpgc.tarantino.indexer.adapters.mongo;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mongodb.MongoDBContainer;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.ulpgc.tarantino.indexer.adapters.index.mongo.MongodbIndexAdapter;
 import org.ulpgc.tarantino.indexer.adapters.metadata.MongodbMetadataAdapter;
 import org.ulpgc.tarantino.indexer.model.book.Book;
@@ -23,22 +18,14 @@ import java.util.Objects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-@Testcontainers(disabledWithoutDocker = true)
 class MongodbAdaptersTest {
 
-    @Container
-    private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:7.0");
-
-    @AfterEach
-    void dropDatabase() {
-        try (MongoClient client = MongoClients.create(MONGO.getConnectionString())) {
-            client.getDatabase("tarantino").drop();
-        }
-    }
+    @RegisterExtension
+    static final TemporaryMongoDatabase MONGO = new TemporaryMongoDatabase();
 
     @Test
     void indexAddsUniquePostingsPerTerm() {
-        MongodbIndexAdapter index = new MongodbIndexAdapter(MONGO.getConnectionString());
+        MongodbIndexAdapter index = new MongodbIndexAdapter(MONGO.uri());
         index.add(new TermOccurrences(1342, Map.of("island", 2, "whale", 1)));
         index.add(new TermOccurrences(5, Map.of("island", 1)));
         index.flush();
@@ -51,14 +38,14 @@ class MongodbAdaptersTest {
 
     @Test
     void flushWithoutPendingTermsWritesNothing() {
-        new MongodbIndexAdapter(MONGO.getConnectionString()).flush();
+        new MongodbIndexAdapter(MONGO.uri()).flush();
 
         assertEquals(0, database().getCollection("inverted_index").countDocuments());
     }
 
     @Test
     void metadataIsUpsertedByBookId() {
-        MongodbMetadataAdapter metadata = new MongodbMetadataAdapter(MONGO.getConnectionString());
+        MongodbMetadataAdapter metadata = new MongodbMetadataAdapter(MONGO.uri());
         metadata.save(new Book(5, "Old title", null, "English", Path.of("datalake", "5", "body.txt")));
         metadata.save(new Book(5, "Robinson Crusoe", null, "English", Path.of("datalake", "5", "body.txt")));
 
@@ -75,6 +62,6 @@ class MongodbAdaptersTest {
     }
 
     private static MongoDatabase database() {
-        return MongoDatabases.database(MONGO.getConnectionString());
+        return MongoDatabases.database(MONGO.uri());
     }
 }

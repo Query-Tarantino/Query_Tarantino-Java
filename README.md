@@ -104,8 +104,8 @@ The following directories are **created at runtime** in the project root and are
 - Java 25
 - Maven 3.9+
 - A Unix system: Linux is the reference platform; macOS works the same
-- MongoDB 7.0, only for the `mongo` index or metadata backends
-- Docker, only for the tests of the MongoDB adapters (and optionally to run MongoDB on Linux)
+- MongoDB 7.0, only for the `mongo` index or metadata backends and their tests
+- Docker, optionally: to run MongoDB on Linux, or for the MongoDB tests where no MongoDB is running (see [Tests](#tests))
 - Python 3.10+ for the comparison report (matplotlib is optional and only adds charts)
 
 MongoDB 7.0 is the version shared by every implementation. For the benchmarks it must run on the machine
@@ -224,11 +224,18 @@ python3 -m unittest discover -s scripts -t scripts    # comparison report
 ```
 
 `mvn test` also runs the conformance cases of `workload/conformance/` (SPEC §13): the header and body split,
-datalake paths, header fields, tokenizer, `folders` file names, query terms and search, each case reported
-by name. The other language implementations must pass the same files.
+datalake paths (where the crawler writes each book and where the indexer reads it), header fields, tokenizer,
+`folders` file names, query terms and search, each case reported by name. The other language implementations
+must pass the same files.
 
-MongoDB adapters are tested with [Testcontainers](https://testcontainers.com/), which starts a disposable
-`mongo:7.0` container for the test run; no MongoDB needs to be running. Without Docker those tests are
+`EndToEndTest`, in the control service, runs the whole pipeline over a local mirror of three small books: the
+control service takes them into the datalake and indexes them in batches of two, and a search finds each book
+with its title and author. It runs once for each datalake layout and each index structure.
+
+The tests of the MongoDB adapters, and the end-to-end run on MongoDB, use the server at `TARANTINO_MONGO_URI`
+(`localhost:27017` by default) when it answers, such as the native install of [Requirements](#requirements), in
+a temporary database of their own that is dropped after each test. Otherwise they start a disposable `mongo:7.0`
+container with [Testcontainers](https://testcontainers.com/) if Docker is running, and without either they are
 skipped, not failed. On macOS with [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop, export
 first:
 

@@ -1,14 +1,9 @@
 package org.ulpgc.tarantino.control;
 
-import org.ulpgc.tarantino.control.adapters.FileControlStateStore;
-import org.ulpgc.tarantino.control.adapters.LocalCrawler;
-import org.ulpgc.tarantino.control.adapters.LocalIndexer;
 import org.ulpgc.tarantino.control.commands.ControlPipeline;
 import org.ulpgc.tarantino.control.model.StepReport;
 import org.ulpgc.tarantino.crawler.CrawlerConfig;
-import org.ulpgc.tarantino.crawler.CrawlerFactory;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
-import org.ulpgc.tarantino.indexer.IndexerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,18 +18,10 @@ public class Main {
 
     public static void main(String[] args) {
         ControlConfig config = ControlConfig.fromEnvironment();
-        ControlPipeline pipeline = pipeline(config, candidatesFile(config, args));
+        ControlPipeline pipeline = ControlFactory.pipeline(config, CrawlerConfig.fromEnvironment(),
+                IndexerConfig.fromEnvironment(), candidates(candidatesFile(config, args)));
         Stream.generate(pipeline::runStep).takeWhile(report -> !report.idle()).forEach(Main::print);
         System.out.println("[CONTROL] Nothing left to do");
-    }
-
-    private static ControlPipeline pipeline(ControlConfig config, Path candidatesFile) {
-        CrawlerConfig crawlerConfig = CrawlerConfig.fromEnvironment();
-        CrawlerFactory.removeIncompleteWrites(crawlerConfig);
-        return new ControlPipeline(new FileControlStateStore(config.control()),
-                new LocalCrawler(CrawlerFactory.ingestCommand(crawlerConfig)),
-                new LocalIndexer(IndexerFactory.indexCommand(IndexerConfig.fromEnvironment())),
-                candidates(candidatesFile), config.indexBatch());
     }
 
     private static Path candidatesFile(ControlConfig config, String[] args) {

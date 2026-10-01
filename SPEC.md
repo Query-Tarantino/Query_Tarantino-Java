@@ -449,7 +449,8 @@ comparison report in `<benchmarks>/report/`, where tied structures share the fir
 
 `TARANTINO_WORKLOAD/conformance/` holds language-neutral cases of the rules above, as JSON files with a
 `spec` description, an optional `stopwords` list and a `cases` array. Every implementation runs them in its
-tests, so it can show it is conformant without comparing datalakes or datamarts by hand.
+tests, so it can show it is conformant without comparing datalakes or datamarts by hand. The datalake paths
+are checked on both sides: the crawler stores each book at them and the indexer finds it there.
 
 | File                  | Rule | Each case                                                                  |
 |-----------------------|------|----------------------------------------------------------------------------|
