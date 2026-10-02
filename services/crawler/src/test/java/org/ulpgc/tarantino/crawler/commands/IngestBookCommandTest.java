@@ -60,6 +60,26 @@ class IngestBookCommandTest {
     }
 
     @Test
+    void downloadsWithoutWritingTheDatalakeUntilTheBookIsStored() {
+        IngestBookCommand ingest = new IngestBookCommand(bookId -> RAW, datalake);
+
+        DownloadResult download = ingest.download(5);
+        assertEquals(DownloadResult.success(new BookText(5, "Title: T", "body")), download);
+        assertFalse(datalake.books.containsKey(5));
+
+        assertEquals(IngestResult.success(5, InMemoryDatalake.paths(5)), ingest.store(download));
+        assertEquals(new BookText(5, "Title: T", "body"), datalake.books.get(5));
+    }
+
+    @Test
+    void storesNothingForAFailedDownload() {
+        IngestBookCommand ingest = new IngestBookCommand(UNREACHABLE, datalake);
+
+        assertEquals(IngestResult.failure(5, FailureReason.NETWORK_ERROR), ingest.store(DownloadResult.failure(5, FailureReason.NETWORK_ERROR)));
+        assertFalse(datalake.books.containsKey(5));
+    }
+
+    @Test
     void reportsStorageErrors() {
         DatalakeStorage broken = new InMemoryDatalake() {
             @Override

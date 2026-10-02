@@ -15,12 +15,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Reads the state once and keeps it in memory, so each step costs the same however many books are done.
- * Downloaded and failed ids only grow during a run, so the first pending candidate never moves back and the
- * books to index form a queue in downloaded order. Books are indexed in batches, one index flush per batch,
- * and marked as indexed only after it (SPEC §9).
+ * Up to {@code parallelDownloads} books are downloaded at once, started in candidates order; whichever finishes
+ * first is stored, marked as downloaded and queued for indexing by the pipeline's own thread, the only one that
+ * uses the datalake, the state and the index. Books are indexed in batches, one index flush per batch, and marked
+ * as indexed only after it, while the next downloads go on (SPEC §9).
  */
 public class ControlPipeline {
 
@@ -30,34 +35,56 @@ public class ControlPipeline {
     private final Crawler crawler;
     private final Indexer indexer;
     private final List<Integer> candidates;
+    private final int parallelDownloads;
     private final int indexBatch;
     private final Set<Integer> downloaded;
+    private final Set<Integer> started = new HashSet<>();
     private final Deque<Integer> toIndex = new ArrayDeque<>();
-    private final Set<Integer> failed = new HashSet<>();
+    private final BlockingQueue<FinishedDownload> finished = new LinkedBlockingQueue<>();
+    private int running;
     private int nextCandidate;
 
     public ControlPipeline(ControlStateStore state, Crawler crawler, Indexer indexer, List<Integer> candidates,
-                           int indexBatch) {
+                           int parallelDownloads, int indexBatch) {
         this.state = state;
         this.crawler = crawler;
         this.indexer = indexer;
         this.candidates = candidates;
+        this.parallelDownloads = parallelDownloads;
         this.indexBatch = indexBatch;
         this.downloaded = new LinkedHashSet<>(state.downloaded());
         Set<Integer> indexed = state.indexed();
         downloaded.stream().filter(id -> !indexed.contains(id)).forEach(toIndex::addLast);
     }
 
-    public NextStep nextStep() {
-        if (toIndex.size() >= indexBatch || (!toIndex.isEmpty() && pendingCandidate().isEmpty())) {
-            return NextStep.index(toIndex.stream().limit(indexBatch).toList());
+    public StepReport runStep() {
+        startDownloads();
+        if (toIndex.size() >= indexBatch || (!toIndex.isEmpty() && running == 0)) {
+            List<Integer> batch = toIndex.stream().limit(indexBatch).toList();
+            return new StepReport(NextStep.index(batch), indexed(batch, indexer.index(batch)));
         }
-        return pendingCandidate().map(NextStep::download).orElseGet(NextStep::idle);
+        if (running > 0) {
+            FinishedDownload download = nextFinishedDownload();
+            return new StepReport(NextStep.download(download.bookId()), downloaded(download));
+        }
+        return new StepReport(NextStep.idle(), Outcome.success("nothing left to do"));
     }
 
-    public StepReport runStep() {
-        NextStep step = nextStep();
-        return new StepReport(step, outcome(step));
+    private void startDownloads() {
+        while (running < parallelDownloads) {
+            Optional<Integer> candidate = pendingCandidate();
+            if (candidate.isEmpty()) {
+                return;
+            }
+            start(candidate.get());
+        }
+    }
+
+    private void start(int bookId) {
+        CompletableFuture<Crawler.Download> download = crawler.ingest(bookId);
+        started.add(bookId);
+        running++;
+        download.whenComplete((book, error) -> finished.add(new FinishedDownload(bookId, book, error)));
     }
 
     private Optional<Integer> pendingCandidate() {
@@ -67,16 +94,29 @@ public class ControlPipeline {
         return nextCandidate < candidates.size() ? Optional.of(candidates.get(nextCandidate)) : Optional.empty();
     }
 
+    /** Downloaded in this run or a previous one, or started in this run, which a failed download is too. */
     private boolean isDone(int bookId) {
-        return downloaded.contains(bookId) || failed.contains(bookId);
+        return downloaded.contains(bookId) || started.contains(bookId);
     }
 
-    private Outcome outcome(NextStep step) {
-        return switch (step.action()) {
-            case INDEX -> indexed(step.bookIds(), indexer.index(step.bookIds()));
-            case DOWNLOAD -> downloaded(step.bookIds().getFirst(), crawler.ingest(step.bookIds().getFirst()));
-            case IDLE -> Outcome.success("nothing left to do");
-        };
+    private FinishedDownload nextFinishedDownload() {
+        try {
+            return finished.take();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for a download", e);
+        }
+    }
+
+    private Outcome downloaded(FinishedDownload download) {
+        running--;
+        Outcome outcome = download.store();
+        if (outcome.succeeded()) {
+            state.markDownloaded(download.bookId());
+            downloaded.add(download.bookId());
+            toIndex.addLast(download.bookId());
+        }
+        return outcome;
     }
 
     private Outcome indexed(List<Integer> bookIds, Map<Integer, Outcome> outcomes) {
@@ -84,8 +124,6 @@ public class ControlPipeline {
             toIndex.removeFirst();
             if (outcomeOf(bookId, outcomes).succeeded()) {
                 state.markIndexed(bookId);
-            } else {
-                failed.add(bookId);
             }
         }
         return bookIds.size() == 1 ? outcomeOf(bookIds.getFirst(), outcomes) : summary(bookIds, outcomes);
@@ -102,14 +140,15 @@ public class ControlPipeline {
         return outcomes.getOrDefault(bookId, MISSING_OUTCOME);
     }
 
-    private Outcome downloaded(int bookId, Outcome outcome) {
-        if (outcome.succeeded()) {
-            state.markDownloaded(bookId);
-            downloaded.add(bookId);
-            toIndex.addLast(bookId);
-        } else {
-            failed.add(bookId);
+    /** A download finished in another thread, stored in the pipeline's; an unexpected error stops the run. */
+    private record FinishedDownload(int bookId, Crawler.Download download, Throwable error) {
+
+        Outcome store() {
+            if (error != null) {
+                Throwable cause = error instanceof CompletionException ? error.getCause() : error;
+                throw cause instanceof RuntimeException unchecked ? unchecked : new IllegalStateException(cause);
+            }
+            return download.store();
         }
-        return outcome;
     }
 }

@@ -8,14 +8,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ControlConfigTest {
 
     @Test
-    void readsAPositiveIndexBatch() {
-        assertEquals(100, ControlConfig.indexBatch("100"));
-        assertEquals(1, ControlConfig.indexBatch(" 1 "));
+    void readsPositiveIntegers() {
+        assertEquals(100, ControlConfig.positiveInteger("TARANTINO_INDEX_BATCH", "100"));
+        assertEquals(1, ControlConfig.positiveInteger("TARANTINO_PARALLEL_DOWNLOADS", " 1 "));
     }
 
     @Test
-    void rejectsAnIndexBatchThatIsNotAPositiveInteger() {
-        assertThrows(IllegalArgumentException.class, () -> ControlConfig.indexBatch("0"));
-        assertThrows(IllegalArgumentException.class, () -> ControlConfig.indexBatch("many"));
+    void rejectsValuesThatAreNotPositiveIntegersNamingTheVariable() {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> ControlConfig.positiveInteger("TARANTINO_PARALLEL_DOWNLOADS", "0"));
+
+        assertEquals("Unknown TARANTINO_PARALLEL_DOWNLOADS: 0 (expected a positive integer)", error.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> ControlConfig.positiveInteger("TARANTINO_INDEX_BATCH", "many"));
     }
 }

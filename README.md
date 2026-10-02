@@ -158,8 +158,9 @@ Every setting has a default that works when running from the project root. Overr
 | `TARANTINO_INDEX`           | `json`                      | `json`, `mongo`, `folders` |
 | `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`        |
 | `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string        |
+| `TARANTINO_PARALLEL_DOWNLOADS` | `8`                      | books the control service downloads at once (1 = one at a time) |
 | `TARANTINO_INDEX_BATCH`     | `100`                       | books indexed per index flush by the control service (1 = book by book) |
-| `TARANTINO_MIRROR`          | (none)                      | local copy of Gutenberg's generated collection to read books from instead of downloading them |
+| `TARANTINO_MIRROR`          | (none)                      | local copy of Gutenberg's generated collection to read books from instead of downloading them; without a workload file, the control service takes all its books |
 
 The crawler and the indexer must use the same `TARANTINO_DATALAKE_LAYOUT`; the indexer and the query service must use
 the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
@@ -168,7 +169,10 @@ the same `TARANTINO_INDEX` and `TARANTINO_METADATA`.
 
 Every service is a plain Java program run through Maven from a terminal; no IDE is needed.
 Always run from the **project root**, so `datalake/`, `datamarts/` and `control/` are created there.
-Books are downloaded from the official Project Gutenberg mirror `mirror.cs.odu.edu`, one request per book.
+Books are downloaded from the official Project Gutenberg mirror `mirror.cs.odu.edu`, one request per book,
+and never from `www.gutenberg.org`, whose robot policy forbids automated access: redirects are followed
+only within the mirror. When the mirror answers that it is busy (HTTP 429 or 503), every download waits as
+long as it asks, or 1, 2, 4, 8 and 16 seconds, and retries up to 5 times (SPEC §4).
 For many books, copy them first in bulk with rsync, Project Gutenberg's documented way to mirror its
 collection, and point `TARANTINO_MIRROR` at the copy; the crawler then reads them from disk:
 
@@ -189,14 +193,16 @@ mvn -q install -DskipTests
 Run it again after changing the code of any service.
 
 **2a. Run the whole pipeline** with the control service. It downloads and indexes every book of a
-workload file (default `workload/sample_ids.txt`) and can be interrupted and run again at any time. It
-indexes in batches of `TARANTINO_INDEX_BATCH` books (100 by default) with one index write per batch, so a
-downloaded book becomes searchable when its batch is written; an interrupted batch is indexed again on the
-next run:
+workload file, or, without one, every book of `TARANTINO_MIRROR` when it is set and those of
+`workload/sample_ids.txt` otherwise. It can be interrupted and run again at any time. It downloads
+`TARANTINO_PARALLEL_DOWNLOADS` books at once (8 by default) and records each one in `control/` as soon as it
+is stored. It indexes in batches of `TARANTINO_INDEX_BATCH` books (100 by default), with one index write per
+batch while the next downloads go on, so a downloaded book becomes searchable when its batch is written; an
+interrupted batch is indexed again on the next run:
 
 ```bash
-mvn -q -pl services/control exec:java
-mvn -q -pl services/control exec:java -Dexec.args="book_ids.txt"
+mvn -q -pl services/control exec:java                              # the sample, or every book of the mirror
+mvn -q -pl services/control exec:java -Dexec.args="book_ids.txt"   # the books of workload/book_ids.txt
 ```
 
 **2b. Or run each service by hand**, in pipeline order. Arguments go in `-Dexec.args`:
@@ -229,9 +235,10 @@ datalake paths (where the crawler writes each book and where the indexer reads i
 `folders` file names, query terms and search, each case reported by name. The other language implementations
 must pass the same files.
 
-`EndToEndTest`, in the control service, runs the whole pipeline over a local mirror of three small books: the
-control service takes them into the datalake and indexes them in batches of two, and a search finds each book
-with its title and author. It runs once for each datalake layout and each index structure.
+`EndToEndTest`, in the control service, runs the whole pipeline over a local mirror of three small books: given
+no workload file, the control service takes every book of the mirror into the datalake, three downloads at
+once, and indexes them in batches of two, and a search finds each book with its title and author. It runs once
+for each datalake layout and each index structure.
 
 The tests of the MongoDB adapters, and the end-to-end run on MongoDB, use the server at `TARANTINO_MONGO_URI`
 (`localhost:27017` by default) when it answers, such as the native install of [Requirements](#requirements), in

@@ -7,7 +7,13 @@ import org.ulpgc.tarantino.crawler.ports.BookDownloader;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
 import java.io.UncheckedIOException;
+import java.util.Optional;
 
+/**
+ * Ingests a book (SPEC §9): looks it up in the datalake and, if it is not there, downloads, splits and stores it.
+ * Callers that download several books at once use the three steps apart: downloading writes nothing, so it can run
+ * in other threads, while looking up and storing stay in the one thread that uses the datalake.
+ */
 public class IngestBookCommand {
 
     private final BookDownloader downloader;
@@ -19,18 +25,31 @@ public class IngestBookCommand {
     }
 
     public IngestResult execute(int bookId) {
-        return datalake.pathsOf(bookId)
-                .map(paths -> IngestResult.success(bookId, paths))
-                .orElseGet(() -> downloadAndStore(bookId));
+        return stored(bookId).orElseGet(() -> store(download(bookId)));
     }
 
-    private IngestResult downloadAndStore(int bookId) {
+    /** The book, if the datalake already holds it: it is not downloaded again. */
+    public Optional<IngestResult> stored(int bookId) {
+        return datalake.pathsOf(bookId).map(paths -> IngestResult.success(bookId, paths));
+    }
+
+    public DownloadResult download(int bookId) {
         try {
-            return IngestResult.success(bookId, datalake.save(GutenbergText.bookText(bookId, downloader.rawText(bookId))));
+            return DownloadResult.success(GutenbergText.bookText(bookId, downloader.rawText(bookId)));
         } catch (DownloadException e) {
-            return IngestResult.failure(bookId, e.reason());
+            return DownloadResult.failure(bookId, e.reason());
+        }
+    }
+
+    /** Stores a downloaded book in the datalake; a failed download stores nothing (SPEC §4). */
+    public IngestResult store(DownloadResult download) {
+        if (!download.succeeded()) {
+            return IngestResult.failure(download.bookId(), download.failure());
+        }
+        try {
+            return IngestResult.success(download.bookId(), datalake.save(download.text()));
         } catch (UncheckedIOException e) {
-            return IngestResult.failure(bookId, FailureReason.STORAGE_ERROR);
+            return IngestResult.failure(download.bookId(), FailureReason.STORAGE_ERROR);
         }
     }
 }

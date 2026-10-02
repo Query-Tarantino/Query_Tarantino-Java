@@ -21,19 +21,20 @@ and SQLite page layout are free. Everything else in this document is normative.
 
 ## 2. Configuration
 
-| Variable                    | Default                     | Values                     |
-|-----------------------------|-----------------------------|----------------------------|
-| `TARANTINO_DATALAKE`        | `datalake`                  | path                       |
-| `TARANTINO_DATAMARTS`       | `datamarts`                 | path                       |
-| `TARANTINO_CONTROL`         | `control`                   | path                       |
-| `TARANTINO_BENCHMARKS`      | `benchmarks`                | path                       |
-| `TARANTINO_WORKLOAD`        | `workload`                  | path                       |
-| `TARANTINO_DATALAKE_LAYOUT` | `time`                      | `time`, `book`, `batch`    |
-| `TARANTINO_INDEX`           | `json`                      | `json`, `folders`, `mongo` |
-| `TARANTINO_METADATA`        | `sqlite`                    | `sqlite`, `mongo`          |
-| `TARANTINO_MONGO_URI`       | `mongodb://localhost:27017` | connection string          |
-| `TARANTINO_INDEX_BATCH`     | `100`                       | positive integer           |
-| `TARANTINO_MIRROR`          | (none)                      | path, or empty             |
+| Variable                       | Default                     | Values                     |
+|--------------------------------|-----------------------------|----------------------------|
+| `TARANTINO_DATALAKE`           | `datalake`                  | path                       |
+| `TARANTINO_DATAMARTS`          | `datamarts`                 | path                       |
+| `TARANTINO_CONTROL`            | `control`                   | path                       |
+| `TARANTINO_BENCHMARKS`         | `benchmarks`                | path                       |
+| `TARANTINO_WORKLOAD`           | `workload`                  | path                       |
+| `TARANTINO_DATALAKE_LAYOUT`    | `time`                      | `time`, `book`, `batch`    |
+| `TARANTINO_INDEX`              | `json`                      | `json`, `folders`, `mongo` |
+| `TARANTINO_METADATA`           | `sqlite`                    | `sqlite`, `mongo`          |
+| `TARANTINO_MONGO_URI`          | `mongodb://localhost:27017` | connection string          |
+| `TARANTINO_PARALLEL_DOWNLOADS` | `8`                         | positive integer           |
+| `TARANTINO_INDEX_BATCH`        | `100`                       | positive integer           |
+| `TARANTINO_MIRROR`             | (none)                      | path, or empty             |
 
 An unknown value is a configuration error and must stop the service with a message naming the value.
 
@@ -41,23 +42,31 @@ An unknown value is a configuration error and must stop the service with a messa
 
 All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped and empty lines ignored.
 
-| File             | Content                                                              |
-|------------------|----------------------------------------------------------------------|
-| `book_ids.txt`   | Candidate ids for the benchmark cache, in order (1 to 4000).         |
-| `sample_ids.txt` | Small sample dataset; default candidates of the control service.     |
-| `stopwords.txt`  | Stopwords; each entry is stripped and lowercased (see §7) on load.   |
-| `queries.txt`    | Search benchmark workload, one `<category>: <query>` per line (§11). |
-| `conformance/`   | Conformance cases every implementation must pass (§13).              |
+| File             | Content                                                               |
+|------------------|-----------------------------------------------------------------------|
+| `book_ids.txt`   | Candidate ids for the benchmark cache, in order (1 to 4000).          |
+| `sample_ids.txt` | Small sample dataset; default candidates of the control service (§9). |
+| `stopwords.txt`  | Stopwords; each entry is stripped and lowercased (see §7) on load.    |
+| `queries.txt`    | Search benchmark workload, one `<category>: <query>` per line (§11).  |
+| `conformance/`   | Conformance cases every implementation must pass (§13).               |
 
 ## 4. Download
 
-- URL: `https://mirror.cs.odu.edu/gutenberg-epub/<id>/pg<id>.txt`, following redirects. This is the official
-  high-speed mirror of Project Gutenberg at Old Dominion University (listed in
-  `https://www.gutenberg.org/MIRRORS.ALL`); it serves the same generated files as
-  `www.gutenberg.org/cache/epub`, which must not be used for bulk downloads.
+- URL: `https://mirror.cs.odu.edu/gutenberg-epub/<id>/pg<id>.txt`. This is the official high-speed mirror
+  of Project Gutenberg at Old Dominion University (listed in `https://www.gutenberg.org/MIRRORS.ALL`); it
+  serves the same generated files as `www.gutenberg.org/cache/epub`. Books are downloaded only from official
+  mirrors, never from `www.gutenberg.org`, whose robot policy forbids automated access to the website, so
+  redirects are followed only within the mirror's host (at most 5): a redirect to any other host fails
+  with `NETWORK_ERROR` before any request is sent there.
 - The response body is decoded as UTF-8.
 - HTTP 200 returns the text. HTTP 404 fails with `NOT_FOUND`. Any other status, timeout or I/O error
-  fails with `NETWORK_ERROR`. A 30 second timeout is recommended.
+  fails with `NETWORK_ERROR`, except the two that mean the mirror is busy, below. A 30 second timeout is
+  recommended.
+- **Busy mirror.** HTTP 429 (Too Many Requests) and 503 (Service Unavailable) are retried, at most 5 times,
+  after waiting what the `Retry-After` header asks, in seconds or as an HTTP date, or 1, 2, 4, 8 and 16
+  seconds on successive answers without it. The wait applies to every download from the mirror, as
+  several run at once (§9): none sends its next request before it ends. If the mirror asks to wait more
+  than 5 minutes, or is still busy after 5 retries, the download fails with `NETWORK_ERROR`.
 - A failed download stores nothing.
 - **Local mirror.** When `TARANTINO_MIRROR` is set, the crawler reads `<mirror>/<id>/pg<id>.txt` from a
   local copy of the same generated collection instead of downloading it, decoded as UTF-8. A missing file
@@ -66,7 +75,8 @@ All files live in `TARANTINO_WORKLOAD`, one entry per line; lines are stripped a
   users only), for example
   `rsync -av --include='*/' --include='pg[0-9]*.txt' --exclude='*' rsync.ibiblio.org::gutenberg-epub/ <mirror>/`
   for the plain texts alone. One transfer instead of one request per book is what makes a collection of
-  hundreds of thousands of books practical to ingest.
+  hundreds of thousands of books practical to ingest. The books of the mirror are its directories named by
+  a book id that hold that `pg<id>.txt`; without a candidates file, the control layer takes them all (§9).
 
 ## 5. Header and body split
 
@@ -192,17 +202,28 @@ step costs the same however many books are already done.
 **Ingestion** of a book is idempotent: if the datalake already contains it (§6), it succeeds with the
 existing paths without downloading again.
 
-**Books to index** are the ids of `downloaded_books.txt`, in file order, that are not in
-`indexed_books.txt` and have not failed during this run. They are indexed in batches of K books,
-K = `TARANTINO_INDEX_BATCH` (100 by default).
+**Downloads.** Up to D books are downloaded at once, D = `TARANTINO_PARALLEL_DOWNLOADS` (8 by default).
+Whenever fewer than D are running, the next candidates, in candidates-file order, that are not in
+`downloaded_books.txt`, have not failed during this run and are not being downloaded start downloading;
+they finish in any order. Only the download (§4) and the split (§5) run in parallel: looking a book up in
+the datalake before downloading it, storing it (§6), the state files and the datamarts are used by one
+thread at a time, the control layer's own, so the datalake keeps a single writer and `time` lookups never
+walk a directory that another thread is changing.
 
-**Next step**, evaluated before every step:
+**Books to index** are the ids of `downloaded_books.txt`, in file order (the order in which their
+downloads finished), that are not in `indexed_books.txt` and have not failed during this run. They are
+indexed in batches of K books, K = `TARANTINO_INDEX_BATCH` (100 by default).
+
+**Next step**, evaluated before every step, once the downloads above are started:
 
 1. `INDEX` the first K books to index, if there are at least K, or all of them if there is at least one
-   and no candidate is left to download.
-2. Otherwise, `DOWNLOAD` the first candidate, in candidates-file order, that is not in
-   `downloaded_books.txt` and has not failed during this run.
+   and no download is running.
+2. Otherwise, if a download is running, `DOWNLOAD`: wait for the first one to finish, whichever it is,
+   and store its book.
 3. Otherwise `IDLE`: the run ends.
+
+Downloads go on while a batch is indexed. With D = 1 books are downloaded one at a time, in
+candidates-file order.
 
 **After each step**, each id is appended to the matching state file **only if it succeeded**.
 A failed id is remembered in memory for the current run and retried on the next run.
@@ -218,7 +239,8 @@ file on every flush and `folders` every term file of the flushed books (see `inc
 and `batch_update_time`, §11). K = 1 indexes book by book.
 
 Candidates come from `TARANTINO_WORKLOAD/<file>`, where `<file>` is the first argument of the control
-service, or `sample_ids.txt` by default.
+service. Without an argument they are every book of the local mirror (§4) in ascending id order when
+`TARANTINO_MIRROR` is set, and the ids of `sample_ids.txt` otherwise.
 
 ## 10. Search
 

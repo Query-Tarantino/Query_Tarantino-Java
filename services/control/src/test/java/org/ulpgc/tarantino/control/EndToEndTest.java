@@ -5,7 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.ulpgc.tarantino.control.commands.ControlPipeline;
-import org.ulpgc.tarantino.control.model.NextStep;
+import org.ulpgc.tarantino.control.model.NextStep.Action;
 import org.ulpgc.tarantino.control.model.StepReport;
 import org.ulpgc.tarantino.crawler.CrawlerConfig;
 import org.ulpgc.tarantino.indexer.IndexerConfig;
@@ -20,14 +20,17 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The whole pipeline over a local mirror of three small books: the control service takes them from the mirror into
- * the datalake and indexes them in batches, and the query service finds them by their words.
+ * The whole pipeline over a local mirror of three small books: with no candidates file the control service takes
+ * every book of the mirror, three at once, into the datalake and indexes them in batches, and the query service
+ * finds them by their words. Downloads finish in any order, so only the batches' sizes are fixed.
  */
 class EndToEndTest {
 
@@ -41,7 +44,7 @@ class EndToEndTest {
             2000, gutenbergText("Don Quijote", "Miguel de Cervantes Saavedra", "Spanish",
                     "En un lugar de la Mancha, de cuyo nombre no quiero acordarme, no ha mucho tiempo que vivía un hidalgo"
                             + " de los de lanza en astillero, adarga antigua, rocín flaco y galgo corredor."));
-    private static final List<Integer> CANDIDATES = List.of(11, 84, 2000);
+    private static final int PARALLEL_DOWNLOADS = 3;
     private static final int INDEX_BATCH = 2;
     private static final String UNUSED_MONGO = "mongodb://localhost:27017";
 
@@ -53,20 +56,22 @@ class EndToEndTest {
 
     @ParameterizedTest(name = "{0} datalake, {1} index, {2} metadata")
     @CsvSource({"time, json, sqlite", "book, folders, sqlite", "batch, mongo, mongo"})
-    void downloadsIndexesAndFindsTheBooksOfAMirror(String layout, String index, String metadata) throws IOException {
+    void downloadsIndexesAndFindsEveryBookOfAMirror(String layout, String index, String metadata) throws IOException {
         String mongoUri = "mongo".equals(index) || "mongo".equals(metadata) ? MONGO.uri() : UNUSED_MONGO;
         Path workload = workload();
-        ControlPipeline pipeline = ControlFactory.pipeline(new ControlConfig(root.resolve("control"), workload, INDEX_BATCH),
-                new CrawlerConfig(root.resolve("datalake"), layout, mirror()),
+        ControlConfig control = new ControlConfig(root.resolve("control"), workload, PARALLEL_DOWNLOADS, INDEX_BATCH);
+        CrawlerConfig crawler = new CrawlerConfig(root.resolve("datalake"), layout, mirror());
+        ControlPipeline pipeline = ControlFactory.pipeline(control, crawler,
                 new IndexerConfig(root.resolve("datalake"), layout, root.resolve("datamarts"), index, metadata, mongoUri, workload),
-                CANDIDATES);
+                ControlFactory.candidates(control, crawler, Optional.empty()));
 
         List<StepReport> reports = run(pipeline);
 
-        assertEquals(List.of(NextStep.download(11), NextStep.download(84), NextStep.index(List.of(11, 84)),
-                NextStep.download(2000), NextStep.index(List.of(2000))), reports.stream().map(StepReport::step).toList());
         assertTrue(reports.stream().allMatch(report -> report.outcome().succeeded()), reports::toString);
-        assertEquals("11\n84\n2000\n", Files.readString(root.resolve("control/indexed_books.txt")));
+        assertEquals(List.of(11, 84, 2000), books(reports, Action.DOWNLOAD));
+        assertEquals(List.of(2, 1), reports.stream().filter(report -> report.step().action() == Action.INDEX)
+                .map(report -> report.step().bookIds().size()).toList());
+        assertEquals(Set.of("11", "84", "2000"), Set.copyOf(Files.readAllLines(root.resolve("control/indexed_books.txt"))));
         SearchCommand search = QueryFactory.searchCommand(new QueryConfig(root.resolve("datamarts"), index, metadata, mongoUri, workload));
         assertEquals(List.of("11 Alice's Adventures in Wonderland by Lewis Carroll",
                 "84 Frankenstein; Or, The Modern Prometheus by Mary Wollstonecraft Shelley"), found(search, "sister"));
@@ -93,6 +98,14 @@ class EndToEndTest {
 
     private static List<StepReport> run(ControlPipeline pipeline) {
         return Stream.generate(pipeline::runStep).takeWhile(report -> !report.idle()).toList();
+    }
+
+    private static List<Integer> books(List<StepReport> reports, Action action) {
+        return reports.stream()
+                .filter(report -> report.step().action() == action)
+                .flatMap(report -> report.step().bookIds().stream())
+                .sorted()
+                .toList();
     }
 
     private static List<String> found(SearchCommand search, String query) {
