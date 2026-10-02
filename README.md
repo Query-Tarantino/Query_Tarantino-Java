@@ -308,10 +308,12 @@ surface gives steadier results. The scratch files go under `benchmarks/tmp.noind
 on macOS; on a Linux desktop with KDE Baloo, which indexes the whole home directory, exclude `benchmarks/` in
 its settings.
 
-A full run with 100, 300 and 1 000 books takes **about 1 hour 10 minutes** on an Apple M4 laptop with an SSD:
-13 minutes for 100 books alone (measured), the larger sizes estimated from how each step grows with N, so it
-depends mostly on the disk. Every benchmark runs in 2 processes (SPEC §11), and two thirds of the time go to
-building and updating the `folders` index, one file per term. These variables shorten it:
+A full run with 100, 300 and 1 000 books took **about 2 hours 10 minutes** on a fanless Apple M4 laptop with
+an SSD (measured): 7 minutes for the crawler, 1 hour 52 minutes for the indexer and 10 minutes for the query
+service. Every benchmark runs in 2 processes (SPEC §11), and most of the time goes to building and updating
+the `folders` index, one file per term, so it depends mostly on the disk. On that laptop the indexer's second
+pass took twice as long as the first (75 against 37 minutes), the slowdown under sustained load described
+above. These variables shorten it:
 
 | Variable                         | Effect                                                        |
 |----------------------------------|---------------------------------------------------------------|
