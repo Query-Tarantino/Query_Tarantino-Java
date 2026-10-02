@@ -254,113 +254,18 @@ export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
 
 ## Benchmarks
 
-### Dataset
-
-Benchmarks read the books from a local cache so the network is never measured. Fill it once, from the
-project root; it can be interrupted and resumes where it stopped:
+[BENCHMARKS.md](BENCHMARKS.md) explains step by step how to fill the dataset, run the benchmarks and build the
+comparison report. In short, from the project root, with MongoDB 7.0 set up as in [Requirements](#requirements):
 
 ```bash
-scripts/fill_cache.sh
+scripts/fill_cache.sh                                     # dataset, once
+mvn -q install -DskipTests                                # build
+caffeinate -i mvn verify -Pbenchmark -DskipTests          # run (Linux: systemd-inhibit --what=idle:sleep)
+python3 scripts/compare_results.py                        # report: benchmarks/report/comparison.md
 ```
 
-It follows `workload/book_ids.txt` until `benchmarks/cache/` holds 2 800 books with Gutenberg markers (ids
-missing or without them are listed in `benchmarks/cache/skipped.txt`). By default it copies the candidates
-from `rsync.ibiblio.org::gutenberg-epub` in one rsync transfer, into `benchmarks/mirror/`, and moves the valid
-ones to the cache. Where the rsync port is blocked, download them over HTTP instead:
-
-```bash
-TARANTINO_CACHE_SOURCE=http scripts/fill_cache.sh
-```
-
-| Variable                   | Effect                                                              |
-|----------------------------|---------------------------------------------------------------------|
-| `TARANTINO_CACHE_BOOKS`    | Books to cache (default 2800)                                       |
-| `TARANTINO_CACHE_SOURCE`   | `rsync` (default) or `http`                                         |
-| `TARANTINO_RSYNC_SOURCE`   | rsync module (default `rsync.ibiblio.org::gutenberg-epub`)          |
-| `TARANTINO_CACHE_PARALLEL` | Simultaneous HTTP downloads (default 16)                            |
-
-The dataset is about 1.3 GB (2 800 books of 470 KB on average). Over HTTP it downloads in about 4 minutes
-with 16 parallel downloads (measured: about 12 books per second); rsync copies it in one transfer, limited
-only by the bandwidth.
-
-### Running
-
-MongoDB 7.0 must be running for the `mongo` structures, set up for benchmarking as described in
-[Requirements](#requirements); stop the development container first (`docker compose down`) if it is not the
-one you set up, since both use port 27017. From the project root:
-
-```bash
-mvn -q install -DskipTests                                 # build the services and the benchmark support jars
-mvn verify -Pbenchmark -DskipTests                         # every service
-mvn verify -Pbenchmark -DskipTests -pl services/indexer    # a single service
-```
-
-Keep the machine as SPEC §11 requires: plugged in, out of any power-saving mode, with nothing else running,
-and awake for the whole run. Wrap the command so the system does not sleep until it ends:
-
-```bash
-systemd-inhibit --what=idle:sleep mvn verify -Pbenchmark -DskipTests   # Linux
-caffeinate -i mvn verify -Pbenchmark -DskipTests                       # macOS
-```
-
-Laptops, above all fanless ones, lower their clock speed under sustained load, so a cool machine on a hard
-surface gives steadier results. The scratch files go under `benchmarks/tmp.noindex/`, which Spotlight skips
-on macOS; on a Linux desktop with KDE Baloo, which indexes the whole home directory, exclude `benchmarks/` in
-its settings.
-
-A full run with 100, 300 and 1 000 books took **about 2 hours 10 minutes** on a fanless Apple M4 laptop with
-an SSD (measured): 7 minutes for the crawler, 1 hour 52 minutes for the indexer and 10 minutes for the query
-service. Every benchmark runs in 2 processes (SPEC §11), and most of the time goes to building and updating
-the `folders` index, one file per term, so it depends mostly on the disk. On that laptop the indexer's second
-pass took twice as long as the first (75 against 37 minutes), the slowdown under sustained load described
-above. These variables shorten it:
-
-| Variable                         | Effect                                                        |
-|----------------------------------|---------------------------------------------------------------|
-| `TARANTINO_BENCHMARK_BOOKS`      | Sizes to run, e.g. `100,300` (default `100,300,1000`)          |
-| `TARANTINO_BENCHMARK_QUICK`      | `true`: 1 process, 1 warm-up and 1 measured iteration, to check the setup |
-| `TARANTINO_BENCHMARK_SKIP_MONGO` | `true`: skip the `mongo` index and metadata structures        |
-
-```bash
-TARANTINO_BENCHMARK_QUICK=true TARANTINO_BENCHMARK_BOOKS=20 mvn verify -Pbenchmark -DskipTests
-```
-
-### Results
-
-`benchmarks/results/java-<service>.csv` holds the results shared with the other languages, in the format
-of [SPEC.md](SPEC.md#11-benchmarks); `benchmarks/<service>/jmh-results-pass-<1|2>.csv` keep the raw JMH output of
-each pass.
-
-| Comparison               | Structures                 | Metrics                                                                  | Benchmarks                                                          |
-|--------------------------|----------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------|
-| Datalake (PDF 3.1)       | `time`, `book`, `batch`    | write throughput, lookup, new books detection, recovery and leftover files, files, disk | crawler `DatalakeWriteBenchmark`, `DatalakeLookupBenchmark`, `NewBooksDetectionBenchmark`, `RecoveryScenario` |
-| Inverted index (PDF 4.2) | `json`, `folders`, `mongo` | full build, incremental update book by book and in batch, index open, query, build and index memory, allocations, terms, disk | indexer `FullIndexBuildBenchmark`, `IncrementalUpdateBenchmark`, query `IndexOpenBenchmark`, `QueryTimeBenchmark` |
-| Metadata (PDF 4.1)       | `sqlite`, `mongo`          | bulk insertion, book by id, books by author                              | indexer `MetadataInsertionBenchmark`, query `MetadataQueryBenchmark` |
-
-How every metric is measured, and the rules that keep results comparable across languages, are defined
-in [SPEC.md](SPEC.md#11-benchmarks).
-
-When comparing languages, note that the Java tokenizer scans code points with `Character.isLetter` instead of
-matching `\p{L}+` with a regular expression. It finds exactly the same terms (`TokenizerEquivalenceTest`
-checks it against the regular expression on thousands of texts, and the SPEC conformance cases pass), but it
-is about 1.6 times faster and allocates half the memory (200 books: 1.15 s and 1.2 GB instead of 1.9 s and
-2.6 GB), which shortens Java's build and update times and lowers its `memory_allocated`.
-
-### Comparing the structures
-
-`scripts/compare_results.py` reads every CSV in `benchmarks/results/` and writes
-`benchmarks/report/comparison.md`: for each comparison, the best structure per metric at the largest size,
-one table per metric (structures against sizes, best value in bold) and one chart per metric if
-matplotlib is installed.
-
-```bash
-python3 scripts/compare_results.py
-```
-
-Like `scripts/fill_cache.sh`, it works from any directory: both resolve paths from the project root.
-
-To compare languages as well, copy the `python-*.csv` and `csharp-*.csv` results of the other
-implementations, run on the same machine, into `benchmarks/results/` before running it.
+A full run with 100, 300 and 1 000 books took **about 2 hours 10 minutes** on a fanless Apple M4 laptop
+(measured). The analysis of the Java results is in [ANALYSIS.md](ANALYSIS.md).
 
 ## Future improvements
 
