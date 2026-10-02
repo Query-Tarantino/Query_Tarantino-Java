@@ -462,6 +462,23 @@ Recommended changes:
 - A column with the normalized author and an index on it, or FTS5 to search words of the author or title. Searching by
   author then goes from O(N) to O(log N + r).
 
+**Limit: one writer at a time.** SQLite locks the whole database file to write, so only one process writes at a time.
+That is enough today, because the control layer is the only one that writes metadata (SPEC §9). With several indexers
+writing at once, as in Stage 2 or with several containers:
+
+- **On the same machine**, their writes queue up: each one waits for the lock, or fails with `SQLITE_BUSY` if no
+  `busy_timeout` is set. WAL mode lets reads go on during a write, but there is still only one writer.
+- **On several machines**, they cannot share the file: SQLite's locks are not reliable over a network file system, and
+  the database can be corrupted.
+
+For a distributed architecture, the logical long-term step is to move the metadata to **PostgreSQL**. Like MongoDB it
+is a server, but relational, and with row locks and MVCC many processes write and read at the same time. It keeps the
+same complexity: a B-tree on `book_id`, and `INSERT … ON CONFLICT DO UPDATE` for the upsert. A trigram index (`pg_trgm`)
+would also let the "contains" search by author use an index instead of scanning the table. The price is the one mongo
+pays here: one network round trip per query, so a book by id would cost about mongo's 48 µs rather than sqlite's 4.6 µs.
+Fetching each page's metadata in a single query (section 7) makes that negligible. PostgreSQL has not been measured
+here: it should be benchmarked as a third metadata backend before switching.
+
 ## 7. The complete search
 
 With the current design, a query costs:
@@ -514,4 +531,5 @@ Improvements for Stage 2, ordered by impact:
 | Store mongo's postings in buckets (`{term, bucket, ids}`) and append with `$push` to the last one | Update a batch | O(T_batch·log V + Σ_touched df) | O(T_batch·log V), with no 16 MB limit |
 | sqlite: one transaction per batch, and an index on the normalized author or FTS5 | Store and search by author | One transaction per book; O(N) | One transaction per batch; O(log N + r) |
 | `batch` datalake with a manifest | Detect new books | O(N) | O(new) |
+| When several processes or machines index at once, PostgreSQL instead of sqlite for the metadata (section 6.5) | Write metadata concurrently | One writer at a time, on one machine | Many writers on any machine, at one network round trip per query |
 | In the longer term, a segment-based index like Lucene's: one immutable segment per batch, background merges and memory-mapped files | Update and query | O(N) per batch | Proportional to the batch's postings, plus O(P·log N) of merges in total, with bounded memory |
