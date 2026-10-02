@@ -13,7 +13,8 @@ public class HeaderParser {
     }
 
     private static Pattern fieldPattern(String name) {
-        return Pattern.compile("^" + name + ":[ \\t]*(.+)$", Pattern.MULTILINE);
+        // Only \n ends a line (SPEC §7), as in Python and C++: by default Java also ends lines at \r, U+0085 and U+2028
+        return Pattern.compile("^" + name + ":[ \\t]*(.+)$", Pattern.MULTILINE | Pattern.UNIX_LINES);
     }
 
     private static String field(Pattern pattern, BookText text) {

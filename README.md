@@ -4,13 +4,15 @@ Java implementation of the data layer of a search engine over [Project Gutenberg
 a **datalake** with the raw texts, **datamarts** with metadata and an inverted index, and a minimal **control layer**
 that coordinates downloading and indexing.
 
-The behavior shared with the Python and C# implementations (split rules, datalake layouts, tokenizer,
-datamart formats, control algorithm and benchmark format) is defined in [SPEC.md](SPEC.md).
+The behavior shared with the Python and C++ implementations (split rules, datalake layouts, tokenizer,
+datamart formats, control algorithm, benchmark format, command-line interface, code layout and tests) is
+defined in [SPEC.md](SPEC.md). This implementation is the reference: the SPEC gives the Python and C++
+equivalent of each choice it makes (SPEC §14).
 
 ## Data structure comparisons
 
 The project implements several interchangeable structures for each part of the data layer and benchmarks
-them against each other with the same books, the same rules and in three languages (Java, Python, C#):
+them against each other with the same books, the same rules and in three languages (Java, Python, C++):
 
 **1. Datalake: how downloaded books are organized** (PDF §3.1)
 

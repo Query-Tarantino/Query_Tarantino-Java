@@ -148,9 +148,10 @@ CSV in `benchmarks/results/` and writes, for each comparison (datalake, inverted
 
 If `benchmarks/results/` holds no CSV, it stops with `No benchmark results found; run the benchmarks first`.
 
-**Comparing languages.** Copy the `python-*.csv` and `csharp-*.csv` results of the other implementations, run
+**Comparing languages.** Copy the `python-*.csv` and `cpp-*.csv` results of the other implementations, run
 on the same machine, into `benchmarks/results/` and run the script again: every table then has a row per
-language and structure, and the winners are chosen per language.
+language and structure, and the winners are chosen per language. Python has no way to count every
+allocation, so `memory_allocated` has no Python rows (SPEC §11).
 
 The analysis of the Java results is in [ANALYSIS.md](ANALYSIS.md).
 

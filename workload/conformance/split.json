@@ -20,6 +20,12 @@
       "body": "Body"
     },
     {
+      "name": "strip removes Java whitespace only, not U+00A0, U+2007, U+202F or U+0085",
+      "raw": "\u00a0Title: F\u2003\n*** START OF THE PROJECT GUTENBERG EBOOK F ***\n\u0085\u3000Body\u202f\u2007\n*** END OF THE PROJECT GUTENBERG EBOOK F ***",
+      "header": "\u00a0Title: F",
+      "body": "\u0085\u3000Body\u202f\u2007"
+    },
+    {
       "name": "missing end marker",
       "raw": "Title: D\n*** START OF THE PROJECT GUTENBERG EBOOK D ***\nBody",
       "failure": "MISSING_MARKERS"

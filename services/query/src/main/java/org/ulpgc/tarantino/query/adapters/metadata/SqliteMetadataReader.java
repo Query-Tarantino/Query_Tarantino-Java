@@ -20,7 +20,7 @@ public class SqliteMetadataReader implements MetadataReader {
 
     private static final String BOOK_BY_ID = "SELECT book_id, title, author, language, path FROM books WHERE book_id = ?";
     private static final String BOOKS_BY_AUTHOR =
-            "SELECT book_id, title, author, language, path FROM books WHERE author LIKE ? ORDER BY book_id";
+            "SELECT book_id, title, author, language, path FROM books WHERE author LIKE ? ESCAPE '\\' ORDER BY book_id";
 
     private final Path database;
     private final Map<String, PreparedStatement> statements = new HashMap<>();
@@ -37,7 +37,12 @@ public class SqliteMetadataReader implements MetadataReader {
 
     @Override
     public List<BookMetadata> booksBy(String author) {
-        return books(BOOKS_BY_AUTHOR, statement -> statement.setString(1, "%" + author + "%"));
+        return books(BOOKS_BY_AUTHOR, statement -> statement.setString(1, "%" + literal(author) + "%"));
+    }
+
+    /** The author as a LIKE pattern that matches it literally: % and _ are not wildcards (SPEC §8.2). */
+    private static String literal(String author) {
+        return author.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private List<BookMetadata> books(String sql, Parameters parameters) {

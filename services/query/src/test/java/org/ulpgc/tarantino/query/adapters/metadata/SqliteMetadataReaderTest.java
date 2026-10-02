@@ -47,6 +47,20 @@ class SqliteMetadataReaderTest {
     }
 
     @Test
+    void matchesPercentUnderscoreAndBackslashLiterally() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO books VALUES (1, 'One', 'A_B\\C', 'English', 'datalake/1/body.txt')");
+            statement.execute("INSERT INTO books VALUES (2, 'Two', 'AxB', 'English', 'datalake/2/body.txt')");
+        }
+        SqliteMetadataReader reader = new SqliteMetadataReader(database);
+
+        assertEquals(List.of(1), reader.booksBy("a_b\\c").stream().map(BookMetadata::bookId).toList());
+        assertEquals(List.of(), reader.booksBy("a_b").stream().filter(book -> book.bookId() == 2).toList());
+        assertEquals(List.of(), reader.booksBy("%"));
+    }
+
+    @Test
     void keepsItsConnectionAndSeesBooksSavedAfterItsFirstQuery() throws SQLException {
         SqliteMetadataReader reader = new SqliteMetadataReader(database);
         assertEquals(Optional.empty(), reader.book(1342));

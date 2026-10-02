@@ -28,6 +28,20 @@
       "title": "Real title",
       "author": null,
       "language": null
+    },
+    {
+      "name": "only \\n ends a line",
+      "header": "Title: Alpha\rOmega\u2028Beta\u0085Gamma\nAuthor: Someone",
+      "title": "Alpha\rOmega\u2028Beta\u0085Gamma",
+      "author": "Someone",
+      "language": null
+    },
+    {
+      "name": "a field needs a character after the colon",
+      "header": "Title:\nTitle: Second\nAuthor:   \nLanguage: English",
+      "title": "Second",
+      "author": "",
+      "language": "English"
     }
   ]
 }
