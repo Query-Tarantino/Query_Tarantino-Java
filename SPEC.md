@@ -1,7 +1,7 @@
 # Query Tarantino — Stage 1 Specification
 
 This document is the contract shared by every language implementation (Java, Python, C++).
-Two implementations are **conformant** when, given the same `workload/` and the same configuration,
+Two implementations are **conformant** when, given the same `../Query_Tarantino-Java/workload` and the same configuration,
 they produce equivalent datalakes, datamarts, control files and search results, so that benchmark
 differences come only from the language and the storage structure.
 
@@ -346,7 +346,7 @@ MongoDB's `i` option folds every letter (§12).
 
 ## 11. Benchmarks
 
-**Dataset.** `scripts/fill_cache.sh` copies raw texts once to `<benchmarks>/cache/<id>.txt`, unchanged,
+**Dataset.** `../Query_Tarantino-Java/scripts/fill_cache.sh` copies raw texts once to `<benchmarks>/cache/<id>.txt`, unchanged,
 following `book_ids.txt`, until the cache holds 2 800 books. By default it copies the candidates in one
 rsync transfer from `rsync.ibiblio.org::gutenberg-epub` (§4, local mirror) to `<benchmarks>/mirror/`;
 with `TARANTINO_CACHE_SOURCE=http`, for networks that block the rsync port, it downloads them over HTTP
@@ -451,7 +451,7 @@ and the benchmark run fails without writing results otherwise:
 `error` is in the unit of the metric. It is `0` for exact metrics (counts, sizes and `recovery_ok`) and
 empty when it cannot be computed (fewer than 2 samples). For a value derived from a time, such as
 `write_throughput` = N / time, the error is the value times the relative error of the time.
-With the results of every language in that directory, `scripts/compare_results.py` builds the
+With the results of every language in that directory, `../Query_Tarantino-Java/scripts/compare_results.py` builds the
 comparison report in `<benchmarks>/report/`, where tied structures share the first place.
 
 | Group    | Structures                   | Metric                     | Unit    |
@@ -696,7 +696,7 @@ line for one book; for a batch, `<n> indexed` or `<k> indexed, <m> skipped`. `�
 
 ## 16. Project structure
 
-Every implementation has the same top level: `services/` with one directory per service (`crawler`,
+Every implementation has the same top level: `../Query_Tarantino-Java/services` with one directory per service (`crawler`,
 `indexer`, `query`, `control`); `scripts/` and `workload/`, copied unchanged from the Java repository; and
 the runtime directories `datalake/`, `datamarts/`, `control/` and `benchmarks/`, which are not versioned.
 
@@ -740,4 +740,4 @@ Every implementation has:
   otherwise a disposable `mongo:7.0` container when Docker runs (Testcontainers in Java and Python; C++ has
   none and skips); otherwise they are skipped, never failed.
 
-The tests of the comparison report, in `scripts/tests/`, are shared by every implementation.
+The tests of the comparison report, in `../Query_Tarantino-Java/scripts/tests`, are shared by every implementation.
