@@ -1,20 +1,20 @@
 package org.ulpgc.tarantino.indexer;
 
-import org.ulpgc.tarantino.indexer.adapters.BatchBasedDatalakeReader;
-import org.ulpgc.tarantino.indexer.adapters.BookBasedDatalakeReader;
-import org.ulpgc.tarantino.indexer.adapters.FileStopwordsLoader;
-import org.ulpgc.tarantino.indexer.adapters.FolderPerTermIndexAdapter;
-import org.ulpgc.tarantino.indexer.adapters.MongodbIndexAdapter;
-import org.ulpgc.tarantino.indexer.adapters.MongodbMetadataAdapter;
-import org.ulpgc.tarantino.indexer.adapters.MonolithicJsonIndexAdapter;
-import org.ulpgc.tarantino.indexer.adapters.SqliteMetadataAdapter;
-import org.ulpgc.tarantino.indexer.adapters.TimeBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.batch.BatchBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.book.BookBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.datalake.time.TimeBasedDatalakeReader;
+import org.ulpgc.tarantino.indexer.adapters.index.folders.FolderPerTermIndexAdapter;
+import org.ulpgc.tarantino.indexer.adapters.index.json.MonolithicJsonIndexAdapter;
+import org.ulpgc.tarantino.indexer.adapters.index.mongo.MongodbIndexAdapter;
+import org.ulpgc.tarantino.indexer.adapters.metadata.MongodbMetadataAdapter;
+import org.ulpgc.tarantino.indexer.adapters.metadata.SqliteMetadataAdapter;
+import org.ulpgc.tarantino.indexer.adapters.stopwords.FileStopwordsLoader;
 import org.ulpgc.tarantino.indexer.commands.IndexBookCommand;
-import org.ulpgc.tarantino.indexer.model.HeaderParser;
-import org.ulpgc.tarantino.indexer.model.Tokenizer;
-import org.ulpgc.tarantino.indexer.ports.DatalakeReader;
-import org.ulpgc.tarantino.indexer.ports.InvertedIndexStorage;
-import org.ulpgc.tarantino.indexer.ports.MetadataStorage;
+import org.ulpgc.tarantino.indexer.model.book.HeaderParser;
+import org.ulpgc.tarantino.indexer.model.terms.Tokenizer;
+import org.ulpgc.tarantino.indexer.ports.datamarts.InvertedIndexStorage;
+import org.ulpgc.tarantino.indexer.ports.datamarts.MetadataStorage;
+import org.ulpgc.tarantino.indexer.ports.sources.DatalakeReader;
 
 import java.util.Map;
 import java.util.Optional;

@@ -1,11 +1,11 @@
 package org.ulpgc.tarantino.query;
 
-import org.ulpgc.tarantino.query.adapters.FileStopwordsLoader;
-import org.ulpgc.tarantino.query.adapters.FolderPerTermIndexReader;
-import org.ulpgc.tarantino.query.adapters.MongodbIndexReader;
-import org.ulpgc.tarantino.query.adapters.MongodbMetadataReader;
-import org.ulpgc.tarantino.query.adapters.MonolithicJsonIndexReader;
-import org.ulpgc.tarantino.query.adapters.SqliteMetadataReader;
+import org.ulpgc.tarantino.query.adapters.index.folders.FolderPerTermIndexReader;
+import org.ulpgc.tarantino.query.adapters.index.json.MonolithicJsonIndexReader;
+import org.ulpgc.tarantino.query.adapters.index.mongo.MongodbIndexReader;
+import org.ulpgc.tarantino.query.adapters.metadata.MongodbMetadataReader;
+import org.ulpgc.tarantino.query.adapters.metadata.SqliteMetadataReader;
+import org.ulpgc.tarantino.query.adapters.stopwords.FileStopwordsLoader;
 import org.ulpgc.tarantino.query.commands.SearchCommand;
 import org.ulpgc.tarantino.query.ports.InvertedIndexReader;
 import org.ulpgc.tarantino.query.ports.MetadataReader;

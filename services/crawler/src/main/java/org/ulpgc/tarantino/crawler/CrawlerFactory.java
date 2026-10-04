@@ -1,13 +1,16 @@
 package org.ulpgc.tarantino.crawler;
 
-import org.ulpgc.tarantino.crawler.adapters.BatchBasedDatalakeAdapter;
-import org.ulpgc.tarantino.crawler.adapters.BookBasedDatalakeAdapter;
-import org.ulpgc.tarantino.crawler.adapters.GutenbergHttpDownloader;
-import org.ulpgc.tarantino.crawler.adapters.TimeBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.batch.BatchBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.book.BookBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.datalake.time.TimeBasedDatalakeAdapter;
+import org.ulpgc.tarantino.crawler.adapters.gutenberg.GutenbergHttpDownloader;
+import org.ulpgc.tarantino.crawler.adapters.gutenberg.LocalMirrorDownloader;
 import org.ulpgc.tarantino.crawler.commands.IngestBookCommand;
+import org.ulpgc.tarantino.crawler.ports.BookDownloader;
 import org.ulpgc.tarantino.crawler.ports.DatalakeStorage;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -23,7 +26,24 @@ public final class CrawlerFactory {
     }
 
     public static IngestBookCommand ingestCommand(CrawlerConfig config) {
-        return new IngestBookCommand(new GutenbergHttpDownloader(), datalake(config));
+        return new IngestBookCommand(downloader(config), datalake(config));
+    }
+
+    /** Run once before ingesting, so an interrupted previous run leaves nothing behind (SPEC §6). */
+    public static void removeIncompleteWrites(CrawlerConfig config) {
+        int removed = datalake(config).removeIncompleteWrites();
+        if (removed > 0) {
+            System.out.println("Removed " + removed + " files left by an interrupted run from " + config.datalake());
+        }
+    }
+
+    public static BookDownloader downloader(CrawlerConfig config) {
+        return config.mirror() == null ? new GutenbergHttpDownloader() : new LocalMirrorDownloader(config.mirror());
+    }
+
+    /** Every book of the local mirror of the configuration, in ascending id order. */
+    public static List<Integer> mirrorBookIds(CrawlerConfig config) {
+        return new LocalMirrorDownloader(config.mirror()).bookIds();
     }
 
     public static DatalakeStorage datalake(CrawlerConfig config) {

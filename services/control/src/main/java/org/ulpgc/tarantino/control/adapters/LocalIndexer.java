@@ -5,6 +5,10 @@ import org.ulpgc.tarantino.control.ports.Indexer;
 import org.ulpgc.tarantino.indexer.commands.IndexBookCommand;
 import org.ulpgc.tarantino.indexer.commands.IndexResult;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 public class LocalIndexer implements Indexer {
 
     private final IndexBookCommand index;
@@ -14,8 +18,10 @@ public class LocalIndexer implements Indexer {
     }
 
     @Override
-    public Outcome index(int bookId) {
-        return outcome(index.execute(bookId));
+    public Map<Integer, Outcome> index(List<Integer> bookIds) {
+        Map<Integer, Outcome> outcomes = new LinkedHashMap<>();
+        index.execute(bookIds).forEach(result -> outcomes.put(result.bookId(), outcome(result)));
+        return outcomes;
     }
 
     private static Outcome outcome(IndexResult result) {

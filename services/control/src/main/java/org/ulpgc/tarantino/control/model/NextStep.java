@@ -1,6 +1,8 @@
 package org.ulpgc.tarantino.control.model;
 
-public record NextStep(Action action, int bookId) {
+import java.util.List;
+
+public record NextStep(Action action, List<Integer> bookIds) {
 
     public enum Action {
         INDEX,
@@ -8,15 +10,27 @@ public record NextStep(Action action, int bookId) {
         IDLE
     }
 
-    public static NextStep index(int bookId) {
-        return new NextStep(Action.INDEX, bookId);
+    public NextStep {
+        bookIds = List.copyOf(bookIds);
+    }
+
+    public static NextStep index(List<Integer> bookIds) {
+        return new NextStep(Action.INDEX, bookIds);
     }
 
     public static NextStep download(int bookId) {
-        return new NextStep(Action.DOWNLOAD, bookId);
+        return new NextStep(Action.DOWNLOAD, List.of(bookId));
     }
 
     public static NextStep idle() {
-        return new NextStep(Action.IDLE, 0);
+        return new NextStep(Action.IDLE, List.of());
+    }
+
+    public String books() {
+        return switch (bookIds.size()) {
+            case 0 -> "";
+            case 1 -> String.valueOf(bookIds.getFirst());
+            default -> "%d books (%d…%d)".formatted(bookIds.size(), bookIds.getFirst(), bookIds.getLast());
+        };
     }
 }
