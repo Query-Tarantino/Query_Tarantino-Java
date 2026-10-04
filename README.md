@@ -12,7 +12,7 @@ equivalent of each choice it makes (SPEC §14).
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     gutenberg[("Project Gutenberg<br/>mirror.cs.odu.edu<br/>or local rsync copy")]
 
     subgraph control_svc["control service"]
